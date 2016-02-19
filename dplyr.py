@@ -19,6 +19,12 @@ class Manager(object):
 X = Manager()
 
 
+class Later(object):
+  def __init__(self):
+    self.num_args = 0
+    self.fcn = None
+
+
 class DplyFrame(DataFrame):
   global X
   def __or__(self, other):
