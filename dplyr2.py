@@ -3,6 +3,7 @@
 
 """Trying to put dplyr-style operations on top of pandas DataFrame."""
 
+import operator
 import sys
 import types
 
@@ -12,13 +13,17 @@ from pandas import DataFrame
 
 
 # TODOs:
-# * "CompoundLater": something like (X.x + X.y) > 5
-# * Reflection thing in Later
+# * Create decorator to get functions to work properly
+# * Add tests
+# * Have mutate accept integers
+# * Reflection thing in Later -- understand this better
+# * make sure to implement reverse methods like "radd" so 1 + X.x will work
 # * Group, ungroup
-# * Mutate 
+
 
 # Scratch
 # https://mtomassoli.wordpress.com/2012/03/18/currying-in-python/
+# http://stackoverflow.com/questions/16372229/how-to-catch-any-method-called-on-an-object-in-python
 
 
 class Manager(object):
@@ -29,78 +34,70 @@ class Manager(object):
 X = Manager()
 
 
+operator_hooks = [name for name in dir(operator) if name.startswith('__') and 
+                  name.endswith('__')]
+
+
+def instrument_operator_hooks(cls):
+  def add_hook(name):
+    operator_func = getattr(operator, name.strip('_'), None)
+    existing = getattr(cls, name, None)
+
+    def op_hook(self, *args, **kw):
+      print "Hooking into {}".format(name)
+      self._function = operator_func
+      self._params = (args, kw)
+      print args
+      # if existing is not None:
+      #   return existing(self, *args, **kw)
+      # TODO: multiple arguments...
+      if len(args) > 0 and type(args[0]) == Later:
+        self.todo.append(lambda df: getattr(df, name)(args[0].applyFcns(self.origDf)))
+      else:  
+        self.todo.append(lambda df: getattr(df, name)(*args, **kw))
+      return self
+
+    try:
+      setattr(cls, name, op_hook)
+    except (AttributeError, TypeError):
+      print "Skipping", name
+      pass  # skip __name__ and __doc__ and the like
+
+  for hook_name in operator_hooks:
+    print "Adding hook to", hook_name
+    add_hook(hook_name)
+  return cls
+
+
+@instrument_operator_hooks
 class Later(object):
   def __init__(self, name):
     self.name = name
     self.todo = [lambda df: df[self.name]]
 
-    # fcnsToChange = ['__add__', '__sub__']
-    # for f in fcnsToChange:
-    #   def newThing(self, arg):
-    #     print "called"
-    #     if type(arg) == Later:
-    #       self.todo.append(lambda df: df.__getattr__(f)(arg.applyFcns(self.origDf)))
-    #     else:  
-    #       self.todo.append(lambda df: df.__getattr__(f)(arg))
-    #     return self
-    #   newThing = types.MethodType(newThing, self)
-    #   print f
-    #   self.__setattr__(f, newThing)
-
   def applyFcns(self, df):
     self.origDf = df
     stmt = df
     for func in self.todo:
+      print func
       stmt = func(stmt)
     return stmt
-
-  # TODO: use reflection on __fcns__ to set everything up
-  # func_name = sys._getframe().f_code.co_name
-  #     print func_name
     
-  def __add__(self, arg):
+  def __getattr__(self, attr):
+    self.todo.append(lambda df: getattr(df, attr))
+    return self
+
+  def __call__(self, *args, **kwargs):
+    self.todo.append(lambda foo: foo.__call__(*args, **kwargs))
+    return self
+
+  # TODO: need to implement the other reverse methods
+  def __radd__(self, arg):
     if type(arg) == Later:
       self.todo.append(lambda df: df.__add__(arg.applyFcns(self.origDf)))
     else:  
       self.todo.append(lambda df: df.__add__(arg))
     return self
-
-  # def __sub__(self, arg):
-  #   if type(arg) == Later:
-  #     self.todo.append(lambda df: df.__sub__(arg.applyFcns(self.origDf)))
-  #   else:  
-  #     self.todo.append(lambda df: df.__sub__(arg))
-  #   return self
-
-  def __eq__(self, arg):
-    self.todo.append(lambda df: df.__eq__(arg))
-    return self
-
-  def __gt__(self, arg):
-    self.todo.append(lambda df: df.__gt__(arg))
-    return self
-
-  def __ge__(self, arg):
-    self.todo.append(lambda df: df.__ge__(arg))
-    return self
-
-  def __lt__(self, arg):
-    self.todo.append(lambda df: df.__lt__(arg))
-    return self
-
-  def __le__(self, arg):
-    self.todo.append(lambda df: df.__le__(arg))
-    return self
-
-fcnsToChange = ['__add__', '__sub__']
-for f in fcnsToChange:
-  def newThing(self, arg):
-    if type(arg) == Later:
-      self.todo.append(lambda df: df.__getattr__(f)(arg.applyFcns(self.origDf)))
-    else:  
-      self.todo.append(lambda df: df.__getattr__(f)(arg))
-    return self
-  setattr(Later, f, newThing)
 
 
 class DplyFrame(DataFrame):
@@ -116,6 +113,7 @@ def dfilter(*args):
     final_filter.index = df.index
     for arg in args:
       stmt = arg.applyFcns(df)
+      print stmt
       final_filter = final_filter & stmt
     if final_filter.dtype != bool:
       raise Exception("Inputs to filter must be boolean")
@@ -131,23 +129,31 @@ def select(*args):
 def mutate(**kwargs):
   def addColumns(df):
     for key, val in kwargs.iteritems():
-      df[key] = val.applyFcns(df)
+      if type(val) == Later:
+        df[key] = val.applyFcns(df)
+      else:
+        df[key] = val
     return DplyFrame(df)
   return addColumns
 
 
-foo | _filter(X.cut == 'Ideal')
+def head(n=10):
+  return lambda df: df[:n]
 
 
-# dsummarize
+# summarize
 
-# darrange
+# arrange
 
-# dgroup_by
+# group_by
 
-# dungroup
+# ungroup
 
-# head
+
+# diamonds | select(-X.cut)
+
+# Should I allow: diamonds | head
+# or keept it mandatory to diamonds | head()
 
 # How does this work with group?
 # sample_n, sample_frac
