@@ -1,8 +1,9 @@
 # Chris Riederer
-# 2015-02-17
+# 2016-02-17
 
 """Trying to put dplyr-style operations on top of pandas DataFrame."""
 
+import itertools
 import operator
 import sys
 import types
@@ -15,6 +16,8 @@ from pandas import DataFrame
 # TODOs:
 # * Group, ungroup
 # * Summarize
+# * How about X._ for referring to the whole DF?
+# * Move special function Later code into Later object
 # * Arrange
 # * Add more tests
 # * Reflection thing in Later -- understand this better
@@ -25,16 +28,22 @@ from pandas import DataFrame
 # * Decorator to let us pipe the whole DF into 
 # * implement the other reverse methods
 # * lint
+# * Let users use strings instead of Laters in certain situations
+# * What about implementing Manager as a container as well? This would help
+#     with situations where column names have spaces. X["type of horse"]
 
 # Scratch
 # https://mtomassoli.wordpress.com/2012/03/18/currying-in-python/
 # http://stackoverflow.com/questions/16372229/how-to-catch-any-method-called-on-an-object-in-python
-# Code somewhere for making operators like |%|, could use instead of |
+# Sort of define your own operators: http://code.activestate.com/recipes/384122/
 
 
 class Manager(object):
   def __getattr__(self, attr):
     return Later(attr)
+
+  # def __getitem__(self, key):
+  #   return Later(key)
 
 
 X = Manager()
@@ -79,6 +88,9 @@ def instrument_operator_hooks(cls):
 class Later(object):
   def __init__(self, name):
     self.name = name
+    # if name == "_":
+    #   self.todo = [lambda df: df]
+    # else:
     self.todo = [lambda df: df[self.name]]
 
   def applyFcns(self, df):
@@ -140,9 +152,23 @@ def DelayFunction(fcn):
 class DplyFrame(DataFrame):
   def __init__(self, df=None):
     super(DplyFrame, self).__init__(df)
-    self.grouped = False
-    self.group_indicies = []
+    if hasattr(df, "grouped"):
+      self.grouped = df.grouped
+    else:
+      self.grouped = False
+    if hasattr(df, "group_indicies"):
+      self.group_indicies = df.group_indicies
+    else:
+      self.group_indicies = False
+    # self.group_indicies = []
     self.groups = []
+
+  # def __getitem__(self, *args, **kwargs):
+  #   out = super(DplyFrame, self).__getitem__(*args, **kwargs)
+  #   out = DplyFrame(out)
+  #   out.grouped = self.grouped
+  #   out.group_indicies = self.group_indicies
+  #   out.groups = self.groups
 
   def __or__(self, delayedFcn):
     otherDf = DplyFrame(self.copy(deep=True))
@@ -185,7 +211,7 @@ def dfilter(*args):
 
 def select(*args):
   names = [column.name for column in args]
-  return lambda df: DplyFrame(df[names])
+  return lambda df: df[names]
 
 
 def mutate(**kwargs):
@@ -195,7 +221,7 @@ def mutate(**kwargs):
         df[key] = val.applyFcns(df)
       else:
         df[key] = val
-    return DplyFrame(df)
+    return df
   return addColumns
 
 
@@ -211,21 +237,27 @@ def PairwiseGreater(series1, series2):
   return newSeries
 
 
-# group_by
+def CreateGroupIndices(df, names, values):
+  final_filter = pandas.Series([True for t in xrange(len(df))])
+  final_filter.index = df.index
+  for (name, val) in zip(names, values):
+    final_filter = final_filter & (df[name] == val)
+  return final_filter
+
+
 def group_by(*args):
-  # TODO: change this to full thing later
-  names = [column.name for column in args]
   def GroupDF(df):
-    name = args[0].name
-    values = set(df[name])  # use dplyr here?
-    # df.groups = [df[df[name] == v] for v in values]
-    df.group_indicies = [df[name] == v for v in values]
+    names = [arg.name for arg in args]
+    values = [set(df[name]) for name in names]  # use dplyr here?
+    df.group_indicies = [CreateGroupIndices(df, names, v) for v in 
+        itertools.product(*values)]
     df.grouped = True
     return df
   return GroupDF
   # options: 
   # make a list of indices
   # make a list of smaller dataframes
+
 
 def UngroupDF(df):
   df.group_indicies = []
@@ -245,12 +277,12 @@ def ungroup():
 
 # ungroup
 
+# sample_n, sample_frac
+# (How does this work with group?)
 
 # diamonds | select(-X.cut)
 
 # Should I allow: diamonds | head
 # or keept it mandatory to diamonds | head()
 
-# How does this work with group?
-# sample_n, sample_frac
 

@@ -136,9 +136,20 @@ class TestFilters(unittest.TestCase):
     self.assertTrue(diamonds_pd.equals(diamonds_dp))    
 
 
+# TODO: Add more multiphase tests
+
 
 class TestGroupBy(unittest.TestCase):
   diamonds = DplyFrame(pandas.read_csv('./diamonds.csv'))
+
+  def testGroupbyDoesntDie(self):
+    self.diamonds | group_by(X.color)
+
+  def testUngroupDoesntDie(self):
+    self.diamonds | ungroup()
+
+  def testGroupbyAndUngroupDoesntDie(self):
+    self.diamonds | group_by(X.color) | ungroup()
 
   def testOneGroupby(self):
     diamonds_pd = self.diamonds.copy()
@@ -149,6 +160,30 @@ class TestGroupBy(unittest.TestCase):
                     mutate(caratMean=X.carat.mean()))
     carats_dp = set(diamonds_dp["caratMean"].values)
     self.assertEquals(carats_pd, carats_dp)
+
+  def testTwoGroupby(self):
+    diamonds_pd = self.diamonds.copy()
+    carats_pd = set(diamonds_pd[diamonds_pd.carat > 3.5].groupby(["color", "cut"]).mean()["carat"])
+    diamonds_dp = (self.diamonds | 
+                    dfilter(X.carat > 3.5) |
+                    group_by(X.color, X.cut) | 
+                    mutate(caratMean=X.carat.mean()))
+    carats_dp = set(diamonds_dp["caratMean"].values)
+    self.assertEquals(carats_pd, carats_dp)
+
+  def testGroupThenFilterDoesntDie(self):
+    diamonds_dp = (self.diamonds | 
+                    group_by(X.color) | 
+                    dfilter(X.carat > 3.5) |
+                    mutate(caratMean=X.carat.mean()))
+
+  def testGroupThenFilterDoesntDie2(self):
+    diamonds_dp = (self.diamonds | 
+                    group_by(X.color) | 
+                    dfilter(X.carat > 3.5, X.color != "I") |
+                    mutate(caratMean=X.carat.mean()))
+
+
 
 
 if __name__ == '__main__':
