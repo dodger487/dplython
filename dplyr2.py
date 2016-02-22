@@ -20,6 +20,8 @@ from pandas import DataFrame
 # * Add more tests
 # * Reflection thing in Later -- understand this better
 # * make sure to implement reverse methods like "radd" so 1 + X.x will work
+# * Should rename some things to be clearer. "df" isn't really a df in the 
+    # __radd__ code, for example 
 
 # Scratch
 # https://mtomassoli.wordpress.com/2012/03/18/currying-in-python/
@@ -100,6 +102,40 @@ class Later(object):
     return self
 
 
+# def CreateLaterFunction(fcn, *args, **kwargs):
+#   l = Later("special")
+#   + "_FUNCTION"
+
+class LaterFunction(Later):
+  def __init__(self, fcn, *args, **kwargs):
+    self.name = fcn.func_name 
+    self.fcn = fcn
+    self.args = args
+    self.kwargs = kwargs
+    def apply_function(self, df):
+      self.origDf = df
+      args = [a.applyFcns(self.origDf) if type(a) == Later else a for a in self.args]
+      kwargs = {k: v.applyFcns(self.origDf) if type(v) == Later else v 
+          for k, v in self.kwargs.iteritems()}
+      print args
+      print kwargs
+      return self.fcn(*args, **kwargs)
+    self.todo = [lambda df: apply_function(self, df)]
+
+
+def DelayFunction(fcn):
+  def DelayedFcnCall(*args, **kwargs):
+    # Check to see if any args or kw are Later. If not, return normal fcn.
+    checkIfLater = lambda x: type(x) == Later
+    if (len(filter(checkIfLater, args)) == 0 and 
+        len(filter(checkIfLater, kwargs.values())) == 0):
+      return fcn(*args, **kwargs)
+    else:
+      return LaterFunction(fcn, *args, **kwargs)
+
+  return DelayedFcnCall
+
+
 class DplyFrame(DataFrame):
   def __or__(self, delayedFcn):
     otherDf = self.copy(deep=True)
@@ -129,7 +165,7 @@ def select(*args):
 def mutate(**kwargs):
   def addColumns(df):
     for key, val in kwargs.iteritems():
-      if type(val) == Later:
+      if type(val) == Later or type(val) == LaterFunction:
         df[key] = val.applyFcns(df)
       else:
         df[key] = val
@@ -140,6 +176,14 @@ def mutate(**kwargs):
 def head(n=10):
   return lambda df: df[:n]
 
+
+@DelayFunction
+def PairwiseGreater(series1, series2):
+  # Assume index is the same
+  index = series1.index
+  newSeries = pandas.Series([max(s1, s2) for s1, s2 in zip(series1, series2)])
+  newSeries.index = index
+  return newSeries
 
 # summarize
 
