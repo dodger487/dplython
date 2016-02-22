@@ -137,5 +137,19 @@ class TestFilters(unittest.TestCase):
 
 
 
+class TestGroupBy(unittest.TestCase):
+  diamonds = DplyFrame(pandas.read_csv('./diamonds.csv'))
+
+  def testOneGroupby(self):
+    diamonds_pd = self.diamonds.copy()
+    carats_pd = set(diamonds_pd[diamonds_pd.carat > 3.5].groupby('color').mean()["carat"])
+    diamonds_dp = (self.diamonds | 
+                    dfilter(X.carat > 3.5) |
+                    group_by(X.color) | 
+                    mutate(caratMean=X.carat.mean()))
+    carats_dp = set(diamonds_dp["caratMean"].values)
+    self.assertEquals(carats_pd, carats_dp)
+
+
 if __name__ == '__main__':
   unittest.main()

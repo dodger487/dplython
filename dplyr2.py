@@ -22,6 +22,9 @@ from pandas import DataFrame
 # * Should rename some things to be clearer. "df" isn't really a df in the 
     # __radd__ code, for example 
 # * sample_n, sample_frac
+# * Decorator to let us pipe the whole DF into 
+# * implement the other reverse methods
+# * lint
 
 # Scratch
 # https://mtomassoli.wordpress.com/2012/03/18/currying-in-python/
@@ -110,7 +113,8 @@ def CreateLaterFunction(fcn, *args, **kwargs):
   laterFcn.kwargs = kwargs
   def apply_function(self, df):
     self.origDf = df
-    args = [a.applyFcns(self.origDf) if type(a) == Later else a for a in self.args]
+    args = [a.applyFcns(self.origDf) if type(a) == Later else a 
+        for a in self.args]
     kwargs = {k: v.applyFcns(self.origDf) if type(v) == Later else v 
         for k, v in self.kwargs.iteritems()}
     print args
@@ -134,9 +138,34 @@ def DelayFunction(fcn):
 
 
 class DplyFrame(DataFrame):
+  def __init__(self, df=None):
+    super(DplyFrame, self).__init__(df)
+    self.grouped = False
+    self.group_indicies = []
+    self.groups = []
+
   def __or__(self, delayedFcn):
-    otherDf = self.copy(deep=True)
-    return delayedFcn(otherDf)
+    otherDf = DplyFrame(self.copy(deep=True))
+    otherDf.grouped = self.grouped  # TODO: this is bad to copy here!!
+    otherDf.group_indicies = self.group_indicies
+    print delayedFcn
+    print "foobar"
+    if delayedFcn == UngroupDF:
+      print "ungrouping..."
+      return delayedFcn(otherDf)
+
+    # TODO: new solution idea-- create groups, apply, ungroup, on each step
+    if self.grouped:
+      groups = [delayedFcn(otherDf[inds]) for inds in self.group_indicies]
+      outDf = DplyFrame(pandas.concat(groups))
+      outDf.grouped = True
+      outDf.group_indicies = self.group_indicies
+      return outDf
+      # for g_inds in group_indicies:
+      #   delayedFcn(otherDf[g_inds])
+      # return otherDf
+    else:
+      return DplyFrame(delayedFcn(otherDf))
 
 
 def dfilter(*args):
@@ -155,7 +184,7 @@ def dfilter(*args):
 
 
 def select(*args):
-  names =[column.name for column in args]
+  names = [column.name for column in args]
   return lambda df: DplyFrame(df[names])
 
 
@@ -182,11 +211,37 @@ def PairwiseGreater(series1, series2):
   return newSeries
 
 
+# group_by
+def group_by(*args):
+  # TODO: change this to full thing later
+  names = [column.name for column in args]
+  def GroupDF(df):
+    name = args[0].name
+    values = set(df[name])  # use dplyr here?
+    # df.groups = [df[df[name] == v] for v in values]
+    df.group_indicies = [df[name] == v for v in values]
+    df.grouped = True
+    return df
+  return GroupDF
+  # options: 
+  # make a list of indices
+  # make a list of smaller dataframes
+
+def UngroupDF(df):
+  df.group_indicies = []
+  df.grouped = False
+  return df
+
+
+def ungroup():
+  return UngroupDF
+  
+
+
+
 # summarize
 
 # arrange
-
-# group_by
 
 # ungroup
 
