@@ -16,16 +16,17 @@ from pandas import DataFrame
 # * Group, ungroup
 # * Summarize
 # * Arrange
-# * Create decorator to get functions to work properly
 # * Add more tests
 # * Reflection thing in Later -- understand this better
 # * make sure to implement reverse methods like "radd" so 1 + X.x will work
 # * Should rename some things to be clearer. "df" isn't really a df in the 
     # __radd__ code, for example 
+# * sample_n, sample_frac
 
 # Scratch
 # https://mtomassoli.wordpress.com/2012/03/18/currying-in-python/
 # http://stackoverflow.com/questions/16372229/how-to-catch-any-method-called-on-an-object-in-python
+# Code somewhere for making operators like |%|, could use instead of |
 
 
 class Manager(object):
@@ -102,26 +103,22 @@ class Later(object):
     return self
 
 
-# def CreateLaterFunction(fcn, *args, **kwargs):
-#   l = Later("special")
-#   + "_FUNCTION"
-
-class LaterFunction(Later):
-  def __init__(self, fcn, *args, **kwargs):
-    self.name = fcn.func_name 
-    self.fcn = fcn
-    self.args = args
-    self.kwargs = kwargs
-    def apply_function(self, df):
-      self.origDf = df
-      args = [a.applyFcns(self.origDf) if type(a) == Later else a for a in self.args]
-      kwargs = {k: v.applyFcns(self.origDf) if type(v) == Later else v 
-          for k, v in self.kwargs.iteritems()}
-      print args
-      print kwargs
-      return self.fcn(*args, **kwargs)
-    self.todo = [lambda df: apply_function(self, df)]
-
+def CreateLaterFunction(fcn, *args, **kwargs):
+  laterFcn = Later(fcn.func_name + "_FUNCTION")
+  laterFcn.fcn = fcn
+  laterFcn.args = args
+  laterFcn.kwargs = kwargs
+  def apply_function(self, df):
+    self.origDf = df
+    args = [a.applyFcns(self.origDf) if type(a) == Later else a for a in self.args]
+    kwargs = {k: v.applyFcns(self.origDf) if type(v) == Later else v 
+        for k, v in self.kwargs.iteritems()}
+    print args
+    print kwargs
+    return self.fcn(*args, **kwargs)
+  laterFcn.todo = [lambda df: apply_function(laterFcn, df)]
+  return laterFcn
+  
 
 def DelayFunction(fcn):
   def DelayedFcnCall(*args, **kwargs):
@@ -131,7 +128,7 @@ def DelayFunction(fcn):
         len(filter(checkIfLater, kwargs.values())) == 0):
       return fcn(*args, **kwargs)
     else:
-      return LaterFunction(fcn, *args, **kwargs)
+      return CreateLaterFunction(fcn, *args, **kwargs)
 
   return DelayedFcnCall
 
@@ -165,7 +162,7 @@ def select(*args):
 def mutate(**kwargs):
   def addColumns(df):
     for key, val in kwargs.iteritems():
-      if type(val) == Later or type(val) == LaterFunction:
+      if type(val) == Later:
         df[key] = val.applyFcns(df)
       else:
         df[key] = val
@@ -179,11 +176,11 @@ def head(n=10):
 
 @DelayFunction
 def PairwiseGreater(series1, series2):
-  # Assume index is the same
   index = series1.index
   newSeries = pandas.Series([max(s1, s2) for s1, s2 in zip(series1, series2)])
   newSeries.index = index
   return newSeries
+
 
 # summarize
 
