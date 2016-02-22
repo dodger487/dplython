@@ -13,13 +13,13 @@ from pandas import DataFrame
 
 
 # TODOs:
+# * Group, ungroup
+# * Summarize
+# * Arrange
 # * Create decorator to get functions to work properly
-# * Add tests
-# * Have mutate accept integers
+# * Add more tests
 # * Reflection thing in Later -- understand this better
 # * make sure to implement reverse methods like "radd" so 1 + X.x will work
-# * Group, ungroup
-
 
 # Scratch
 # https://mtomassoli.wordpress.com/2012/03/18/currying-in-python/
