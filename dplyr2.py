@@ -324,3 +324,6 @@ def sample_n(n):
 def sample_frac(frac):
   # return X._.sample(frac=frac)
   return lambda df: DplyFrame(df.sample(frac=frac))
+
+
+nrow = X._.__len__
