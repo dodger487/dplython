@@ -15,16 +15,19 @@ from pandas import DataFrame
 
 # TODOs:
 # * Summarize
-# * How about X._ for referring to the whole DF?
-# * Move special function Later code into Later object
 # * Arrange
+# * sample_n, sample_frac
+# (How does this work with group?)
+# * make sure to implement reverse methods like "radd" so 1 + X.x will work
+# * Can we deal with cases x + y, where x does not have __add__ but y has __radd__?
+# * How about X._ for referring to the whole DF?
+# * diamonds | select(-X.cut)
+# * Move special function Later code into Later object
 # * Add more tests
 # * Reflection thing in Later -- understand this better
-# * make sure to implement reverse methods like "radd" so 1 + X.x will work
 # * Should rename some things to be clearer. "df" isn't really a df in the 
     # __radd__ code, for example 
-# * sample_n, sample_frac
-# * Decorator to let us pipe the whole DF into 
+# * Decorator to let us pipe the whole DF into functions
 # * implement the other reverse methods
 # * lint
 # * Let users use strings instead of Laters in certain situations
@@ -175,7 +178,13 @@ class DplyFrame(DataFrame):
     otherDf.grouped = self.grouped  # TODO: this is bad to copy here!!
     otherDf.group_indicies = self.group_indicies
     print delayedFcn
+    print UngroupDF
     print "foobar"
+
+    # TODO: decide if we like this feature
+    if type(delayedFcn) == Later:
+      return delayedFcn.applyFcns(self)
+
     if delayedFcn == UngroupDF:
       print "ungrouping..."
       return delayedFcn(otherDf)
@@ -221,6 +230,8 @@ def mutate(**kwargs):
   return addColumns
 
 
+# TODO: might make sense to change this to pipeable thing
+# or use df | X._.head
 def head(n=10):
   return lambda df: df[:n]
 
@@ -278,17 +289,10 @@ def ungroup():
   return UngroupDF
   
 
-
-# summarize
-
-# arrange
-
-# sample_n, sample_frac
-# (How does this work with group?)
-
-# diamonds | select(-X.cut)
-
-# Should I allow: diamonds | head
-# or keept it mandatory to diamonds | head()
-
-
+def arrange(*args):
+  # TODO: add in descending and ascending
+  # TODO(cjr): my current version of Pandas isn't up-to-date, so this doesn't
+  # exist yet. How embarrassing!
+  # return lambda df: df.sort_values(names)
+  names = [column.name for column in args]
+  return lambda df: DplyFrame(df.sort(names))

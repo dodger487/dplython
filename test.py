@@ -187,6 +187,29 @@ class TestGroupBy(unittest.TestCase):
 class TestSummarize(unittest.TestCase):
   diamonds = DplyFrame(pandas.read_csv('./diamonds.csv'))
 
+  def testArrangeDoesntDie(self):
+    self.diamonds | arrange(X.cut)
+
+  def testArrangeThenSelect(self):
+    self.diamonds | arrange(X.color) | select(X.color)
+
+  def testMultipleSort(self):
+    self.diamonds | arrange(X.color, X.cut) | select(X.color)
+
+  def testArrangeSorts(self):
+    sortedColor_pd = self.diamonds.copy().sort("color")["color"]
+    sortedColor_dp = (self.diamonds | arrange(X.color))["color"]
+    self.assertEquals(sortedColor_pd, sortedColor_dp)
+
+  def testMultiArrangeSorts(self):
+    sortedCarat_pd = self.diamonds.copy().sort(["color", "carat"])["carat"]
+    sortedCarat_dp = (self.diamonds | arrange(X.color))["carat"]
+    self.assertEquals(sortedCarat_pd, sortedCarat_dp)
+
+
+class TestSummarize(unittest.TestCase):
+  diamonds = DplyFrame(pandas.read_csv('./diamonds.csv'))
+
   def testSummarizeDoesntDie(self):
     self.diamonds | summarize(sumX=X.x.sum())
 
