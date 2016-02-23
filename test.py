@@ -184,7 +184,24 @@ class TestGroupBy(unittest.TestCase):
                     mutate(caratMean=X.carat.mean()))
 
 
+class TestSummarize(unittest.TestCase):
+  diamonds = DplyFrame(pandas.read_csv('./diamonds.csv'))
 
+  def testSummarizeDoesntDie(self):
+    self.diamonds | summarize(sumX=X.x.sum())
+
+  def testSummarizeX(self):
+    diamonds_pd = self.diamonds.copy()
+    sumX_pd = diamonds_pd.sum()["x"]
+    sumX_dp = (self.diamonds | summarize(sumX=X.x.sum()))["sumX"][0]
+    self.assertEquals(round(sumX_pd), round(sumX_dp))
+
+  def testSummarizeGroupedX(self):
+    diamonds_pd = self.diamonds.copy()
+    sumX_pd = diamonds_pd.groupby("cut").sum()["x"]["Fair"]
+    sumX_dp = (self.diamonds | group_by(X.cut) | summarize(sumX=X.x))["sumX"]
+    self.assertEquals(sumX_pd, sumX_dp)
+    
 
 if __name__ == '__main__':
   unittest.main()

@@ -14,7 +14,6 @@ from pandas import DataFrame
 
 
 # TODOs:
-# * Group, ungroup
 # * Summarize
 # * How about X._ for referring to the whole DF?
 # * Move special function Later code into Later object
@@ -88,10 +87,10 @@ def instrument_operator_hooks(cls):
 class Later(object):
   def __init__(self, name):
     self.name = name
-    # if name == "_":
-    #   self.todo = [lambda df: df]
-    # else:
-    self.todo = [lambda df: df[self.name]]
+    if name == "_":
+      self.todo = [lambda df: df]
+    else:
+      self.todo = [lambda df: df[self.name]]
 
   def applyFcns(self, df):
     self.origDf = df
@@ -119,7 +118,8 @@ class Later(object):
 
 
 def CreateLaterFunction(fcn, *args, **kwargs):
-  laterFcn = Later(fcn.func_name + "_FUNCTION")
+  laterFcn = Later("_FUNCTION")
+  # laterFcn = Later(fcn.func_name + "_FUNCTION")
   laterFcn.fcn = fcn
   laterFcn.args = args
   laterFcn.kwargs = kwargs
@@ -150,8 +150,8 @@ def DelayFunction(fcn):
 
 
 class DplyFrame(DataFrame):
-  def __init__(self, df=None):
-    super(DplyFrame, self).__init__(df)
+  def __init__(self, df=None, **kwargs):
+    super(DplyFrame, self).__init__(df, **kwargs)
     if hasattr(df, "grouped"):
       self.grouped = df.grouped
     else:
@@ -180,16 +180,12 @@ class DplyFrame(DataFrame):
       print "ungrouping..."
       return delayedFcn(otherDf)
 
-    # TODO: new solution idea-- create groups, apply, ungroup, on each step
     if self.grouped:
       groups = [delayedFcn(otherDf[inds]) for inds in self.group_indicies]
       outDf = DplyFrame(pandas.concat(groups))
       outDf.grouped = True
       outDf.group_indicies = self.group_indicies
       return outDf
-      # for g_inds in group_indicies:
-      #   delayedFcn(otherDf[g_inds])
-      # return otherDf
     else:
       return DplyFrame(delayedFcn(otherDf))
 
@@ -259,6 +255,19 @@ def group_by(*args):
   # make a list of smaller dataframes
 
 
+def summarize(**kwargs):
+  def CreateSummarizedDf(df):
+    input_dict = {k: val.applyFcns(df) for k, val in kwargs.iteritems()}
+    # DataFrame weirdly chokes on init if given a dictionary whose keys are not
+    # iterable. It needs to be told explicitly the index.
+    # if hasattr(input_dict.values()[0], '__iter__'):
+    #   index = range(len(input_dict.values()[0]))
+    # else:
+    index = [0]
+    return DplyFrame(input_dict, index=index)
+  return CreateSummarizedDf
+
+
 def UngroupDF(df):
   df.group_indicies = []
   df.grouped = False
@@ -270,12 +279,9 @@ def ungroup():
   
 
 
-
 # summarize
 
 # arrange
-
-# ungroup
 
 # sample_n, sample_frac
 # (How does this work with group?)
