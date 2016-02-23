@@ -52,7 +52,7 @@ X = Manager()
 
 operator_hooks = [name for name in dir(operator) if name.startswith('__') and 
                   name.endswith('__')]
-
+operator_hooks.remove("__add__")
 
 def instrument_operator_hooks(cls):
   def add_hook(name):
@@ -113,12 +113,12 @@ class Later(object):
   def __add__(self, arg):
     print "special add"
     def TryRaddIfNoAdd(df):
-      if "__add__" in dir(df)
+      if "__add__" in dir(df):
         return df.__add__(arg)
       else:
         return arg.__radd__(df)
     def TryRaddIfNoAddLater(df):
-      if "__add__" in dir(df)
+      if "__add__" in dir(df):
         return df.__add__(arg.applyFcns(self.origDf))
       else:
         return arg.applyFcns(self.origDf).__radd__(df)
