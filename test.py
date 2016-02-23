@@ -185,7 +185,7 @@ class TestGroupBy(unittest.TestCase):
                     mutate(caratMean=X.carat.mean()))
 
 
-class TestSummarize(unittest.TestCase):
+class TestArrange(unittest.TestCase):
   diamonds = DplyFrame(pandas.read_csv('./diamonds.csv'))
 
   def testArrangeDoesntDie(self):
@@ -200,12 +200,12 @@ class TestSummarize(unittest.TestCase):
   def testArrangeSorts(self):
     sortedColor_pd = self.diamonds.copy().sort("color")["color"]
     sortedColor_dp = (self.diamonds | arrange(X.color))["color"]
-    self.assertEquals(sortedColor_pd, sortedColor_dp)
+    self.assertTrue(sortedColor_pd.equals(sortedColor_dp))
 
   def testMultiArrangeSorts(self):
     sortedCarat_pd = self.diamonds.copy().sort(["color", "carat"])["carat"]
-    sortedCarat_dp = (self.diamonds | arrange(X.color))["carat"]
-    self.assertEquals(sortedCarat_pd, sortedCarat_dp)
+    sortedCarat_dp = (self.diamonds | arrange(X.color, X.carat))["carat"]
+    self.assertTrue(sortedCarat_pd.equals(sortedCarat_dp))
 
 
 class TestSample(unittest.TestCase):
@@ -262,9 +262,14 @@ class TestSummarize(unittest.TestCase):
 
   def testSummarizeGroupedX(self):
     diamonds_pd = self.diamonds.copy()
-    sumX_pd = diamonds_pd.groupby("cut").sum()["x"]["Fair"]
-    sumX_dp = (self.diamonds | group_by(X.cut) | summarize(sumX=X.x))["sumX"]
-    self.assertEquals(sumX_pd, sumX_dp)
+    sumX_pd = diamonds_pd.groupby("cut").sum()["x"]
+    val_pd = sumX_pd.values.copy()
+    val_pd.sort()
+    valX_dp = (self.diamonds | group_by(X.cut) |
+                summarize(sumX=X.x.sum()) | X._["sumX"]).values.copy()
+    valX_dp.sort()
+    for i, j in zip(val_pd, valX_dp):
+      self.assertEquals(round(i), round(j))
     
 
 if __name__ == '__main__':

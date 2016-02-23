@@ -180,24 +180,46 @@ class DplyFrame(DataFrame):
       self.grouped = df.grouped
     else:
       self.grouped = False
-    if hasattr(df, "group_indicies"):
-      self.group_indicies = df.group_indicies
+    if hasattr(df, "group_indices"):
+      self.group_indices = df.group_indices
     else:
-      self.group_indicies = False
-    # self.group_indicies = []
+      self.group_indices = False
+    if hasattr(df, "group_names"):
+      self.group_names = df.group_names
+    else:
+      self.group_names = None
+
     self.groups = []
 
-  # def __getitem__(self, *args, **kwargs):
-  #   out = super(DplyFrame, self).__getitem__(*args, **kwargs)
-  #   out = DplyFrame(out)
-  #   out.grouped = self.grouped
-  #   out.group_indicies = self.group_indicies
-  #   out.groups = self.groups
+  def CreateGroupIndices(self, names, values):
+    final_filter = pandas.Series([True for t in xrange(len(self))])
+    final_filter.index = self.index
+    for (name, val) in zip(names, values):
+      final_filter = final_filter & (self[name] == val)
+    return final_filter
+
+  # def group_by(*args):
+  #   def GroupDF(df):
+  #     names = [arg.name for arg in args]
+  #     values = [set(df[name]) for name in names]  # use dplyr here?
+  #     df.group_indices = [CreateGroupIndices(df, names, v) for v in 
+  #         itertools.product(*values)]
+  #     df.grouped = True
+  #     return df
+  #   return GroupDF
+
+  def group_self(self, names):
+    values = [set(self[name]) for name in names]  # use dplyr here?
+    self.group_indices = [self.CreateGroupIndices(names, v) for v in 
+        itertools.product(*values)]
+    self.grouped = True
+    self.group_names = names
+    self.group_values = values
 
   def __or__(self, delayedFcn):
     otherDf = DplyFrame(self.copy(deep=True))
     otherDf.grouped = self.grouped  # TODO: this is bad to copy here!!
-    otherDf.group_indicies = self.group_indicies
+    otherDf.group_indices = self.group_indices
     print delayedFcn
     print UngroupDF
     print "foobar"
@@ -211,10 +233,18 @@ class DplyFrame(DataFrame):
       return delayedFcn(otherDf)
 
     if self.grouped:
-      groups = [delayedFcn(otherDf[inds]) for inds in self.group_indicies]
+      print self.group_names
+      self.group_self(self.group_names)
+      groups = [otherDf[inds] for inds in self.group_indices]
+      group_dicts = [dict(zip(self.group_names, v)) for v in itertools.product(*self.group_values)]
+      for g, group_dict in zip(groups, group_dicts):  #TEMPHACK
+        g.group_dict = group_dict
+      groups = [delayedFcn(g) for g in groups]
       outDf = DplyFrame(pandas.concat(groups))
       outDf.grouped = True
-      outDf.group_indicies = self.group_indicies
+      outDf.group_indices = self.group_indices
+      outDf.group_names = self.group_names
+      outDf.index = range(len(outDf))
       return outDf
     else:
       return DplyFrame(delayedFcn(otherDf))
@@ -275,11 +305,12 @@ def CreateGroupIndices(df, names, values):
 
 def group_by(*args):
   def GroupDF(df):
-    names = [arg.name for arg in args]
-    values = [set(df[name]) for name in names]  # use dplyr here?
-    df.group_indicies = [CreateGroupIndices(df, names, v) for v in 
-        itertools.product(*values)]
-    df.grouped = True
+    df.group_self([arg.name for arg in args])
+    # names = [arg.name for arg in args]
+    # values = [set(df[name]) for name in names]  # use dplyr here?
+    # df.group_indices = [CreateGroupIndices(df, names, v) for v in 
+    #     itertools.product(*values)]
+    # df.grouped = True
     return df
   return GroupDF
 
@@ -287,6 +318,14 @@ def group_by(*args):
 def summarize(**kwargs):
   def CreateSummarizedDf(df):
     input_dict = {k: val.applyFcns(df) for k, val in kwargs.iteritems()}
+    print input_dict
+    if len(input_dict) == 0:
+      return DplyFrame({}, index=index)
+    if hasattr(df, 'group_dict'):
+      input_dict.update(df.group_dict)
+    #       values = [set(self[name]) for name in names]  # use dplyr here?
+    # self.group_indices = [self.CreateGroupIndices(names, v) for v in 
+    #     itertools.product(*values)]
     # DataFrame weirdly chokes on init if given a dictionary whose keys are not
     # iterable. It needs to be told explicitly the index.
     # if hasattr(input_dict.values()[0], '__iter__'):
@@ -298,7 +337,7 @@ def summarize(**kwargs):
 
 
 def UngroupDF(df):
-  df.group_indicies = []
+  df.group_indices = []
   df.grouped = False
   return df
 
