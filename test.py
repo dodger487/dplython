@@ -3,6 +3,7 @@
 
 """Testing for python dplyr."""
 
+import math
 import unittest
 
 import pandas
@@ -205,6 +206,46 @@ class TestSummarize(unittest.TestCase):
     sortedCarat_pd = self.diamonds.copy().sort(["color", "carat"])["carat"]
     sortedCarat_dp = (self.diamonds | arrange(X.color))["carat"]
     self.assertEquals(sortedCarat_pd, sortedCarat_dp)
+
+
+class TestSample(unittest.TestCase):
+  diamonds = DplyFrame(pandas.read_csv('./diamonds.csv'))
+
+  def testSamplesDontDie(self):
+    self.diamonds | sample_n(5)
+    self.diamonds | sample_frac(0.5)
+
+  def testSamplesGetsRightNumber(self):
+    shouldBe5 = self.diamonds | sample_n(5) | X._.__len__()
+    self.assertEquals(shouldBe5, 5)
+    frac = len(self.diamonds) * 0.1
+    shouldBeFrac = self.diamonds | sample_frac(0.1) | X._.__len__()
+    self.assertEquals(shouldBeFrac, frac)
+
+  def testSampleEqualsPandasSample(self):
+    for i in [1, 10, 100, 1000]:
+      shouldBeI = self.diamonds | sample_n(i) | X._.__len__()
+      self.assertEquals(shouldBeI, i)
+    for i in [.1, .01, .001]:
+      shouldBeI = self.diamonds | sample_frac(i) | X._.__len__()
+      self.assertEquals(shouldBeI, round(len(self.diamonds)*i))
+
+  def testSample0(self):
+    shouldBe0 = self.diamonds | sample_n(0) | X._.__len__()
+    self.assertEquals(shouldBe0, 0)
+    shouldBeFrac = self.diamonds | sample_frac(0) | X._.__len__()
+    self.assertEquals(shouldBeFrac, 0.)
+
+  def testGroupedSample(self):
+    num_groups = len(set(self.diamonds["cut"]))
+    for i in [0, 1, 10, 100, 1000]:
+      numRows = self.diamonds | group_by(X.cut) | sample_n(i) | X._.__len__()
+      self.assertEquals(numRows, i*num_groups)
+    for i in [.1, .01, .001]:
+      shouldBeI = self.diamonds | group_by(X.cut) | sample_frac(i) | X._.__len__()
+      out = sum([len(self.diamonds[self.diamonds.cut == c].sample(frac=i)) for c in set(self.diamonds.cut)])
+      # self.assertEquals(shouldBeI, math.floor(len(self.diamonds)*i))
+      self.assertEquals(shouldBeI, out)
 
 
 class TestSummarize(unittest.TestCase):

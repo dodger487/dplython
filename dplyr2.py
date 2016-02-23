@@ -15,12 +15,10 @@ from pandas import DataFrame
 
 # TODOs:
 # * Summarize
-# * Arrange
-# * sample_n, sample_frac
-# (How does this work with group?)
+
+# * Cast output from DplyFrame methods to be DplyFrame
 # * make sure to implement reverse methods like "radd" so 1 + X.x will work
 # * Can we deal with cases x + y, where x does not have __add__ but y has __radd__?
-# * How about X._ for referring to the whole DF?
 # * diamonds | select(-X.cut)
 # * Move special function Later code into Later object
 # * Add more tests
@@ -31,6 +29,7 @@ from pandas import DataFrame
 # * implement the other reverse methods
 # * lint
 # * Let users use strings instead of Laters in certain situations
+#     e.g. select("cut", "carat")
 # * What about implementing Manager as a container as well? This would help
 #     with situations where column names have spaces. X["type of horse"]
 
@@ -296,3 +295,13 @@ def arrange(*args):
   # return lambda df: df.sort_values(names)
   names = [column.name for column in args]
   return lambda df: DplyFrame(df.sort(names))
+
+
+def sample_n(n):
+  # return X._.sample(n=n)
+  return lambda df: DplyFrame(df.sample(n))
+
+
+def sample_frac(frac):
+  # return X._.sample(frac=frac)
+  return lambda df: DplyFrame(df.sample(frac=frac))
