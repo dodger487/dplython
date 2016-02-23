@@ -110,6 +110,28 @@ class Later(object):
     self.todo.append(lambda foo: foo.__call__(*args, **kwargs))
     return self
 
+  def __add__(self, arg):
+    print "special add"
+    def TryRaddIfNoAdd(df):
+      if "__add__" in dir(df)
+        return df.__add__(arg)
+      else:
+        return arg.__radd__(df)
+    def TryRaddIfNoAddLater(df):
+      if "__add__" in dir(df)
+        return df.__add__(arg.applyFcns(self.origDf))
+      else:
+        return arg.applyFcns(self.origDf).__radd__(df)
+    
+    if type(arg) == Later:
+      self.todo.append(TryRaddIfNoAddLater)
+      # self.todo.append(lambda df: df.__add__(arg.applyFcns(self.origDf)))
+    else:  
+      self.todo.append(TryRaddIfNoAdd)
+      # self.todo.append(lambda df: df.__add__(arg))
+    return self
+
+
   # TODO: need to implement the other reverse methods
   def __radd__(self, arg):
     if type(arg) == Later:
@@ -260,9 +282,6 @@ def group_by(*args):
     df.grouped = True
     return df
   return GroupDF
-  # options: 
-  # make a list of indices
-  # make a list of smaller dataframes
 
 
 def summarize(**kwargs):
