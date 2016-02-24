@@ -14,19 +14,20 @@ from pandas import DataFrame
 
 
 # TODOs:
-# * Summarize
+# * Refactor group_by
 
+# * use |X| ??
 # * Cast output from DplyFrame methods to be DplyFrame
 # * make sure to implement reverse methods like "radd" so 1 + X.x will work
 # * Can we deal with cases x + y, where x does not have __add__ but y has __radd__?
+# * implement the other reverse methods
+
 # * diamonds | select(-X.cut)
 # * Move special function Later code into Later object
 # * Add more tests
 # * Reflection thing in Later -- understand this better
 # * Should rename some things to be clearer. "df" isn't really a df in the 
     # __radd__ code, for example 
-# * Decorator to let us pipe the whole DF into functions
-# * implement the other reverse methods
 # * lint
 # * Let users use strings instead of Laters in certain situations
 #     e.g. select("cut", "carat")
@@ -53,6 +54,7 @@ X = Manager()
 operator_hooks = [name for name in dir(operator) if name.startswith('__') and 
                   name.endswith('__')]
 operator_hooks.remove("__add__")
+
 
 def instrument_operator_hooks(cls):
   def add_hook(name):
@@ -130,7 +132,6 @@ class Later(object):
       self.todo.append(TryRaddIfNoAdd)
       # self.todo.append(lambda df: df.__add__(arg))
     return self
-
 
   # TODO: need to implement the other reverse methods
   def __radd__(self, arg):
@@ -220,11 +221,7 @@ class DplyFrame(DataFrame):
     otherDf = DplyFrame(self.copy(deep=True))
     otherDf.grouped = self.grouped  # TODO: this is bad to copy here!!
     otherDf.group_indices = self.group_indices
-    print delayedFcn
-    print UngroupDF
-    print "foobar"
 
-    # TODO: decide if we like this feature
     if type(delayedFcn) == Later:
       return delayedFcn.applyFcns(self)
 
@@ -318,19 +315,10 @@ def group_by(*args):
 def summarize(**kwargs):
   def CreateSummarizedDf(df):
     input_dict = {k: val.applyFcns(df) for k, val in kwargs.iteritems()}
-    print input_dict
     if len(input_dict) == 0:
       return DplyFrame({}, index=index)
     if hasattr(df, 'group_dict'):
       input_dict.update(df.group_dict)
-    #       values = [set(self[name]) for name in names]  # use dplyr here?
-    # self.group_indices = [self.CreateGroupIndices(names, v) for v in 
-    #     itertools.product(*values)]
-    # DataFrame weirdly chokes on init if given a dictionary whose keys are not
-    # iterable. It needs to be told explicitly the index.
-    # if hasattr(input_dict.values()[0], '__iter__'):
-    #   index = range(len(input_dict.values()[0]))
-    # else:
     index = [0]
     return DplyFrame(input_dict, index=index)
   return CreateSummarizedDf
@@ -348,9 +336,6 @@ def ungroup():
 
 def arrange(*args):
   # TODO: add in descending and ascending
-  # TODO(cjr): my current version of Pandas isn't up-to-date, so this doesn't
-  # exist yet. How embarrassing!
-  # return lambda df: df.sort_values(names)
   names = [column.name for column in args]
   return lambda df: DplyFrame(df.sort(names))
 
