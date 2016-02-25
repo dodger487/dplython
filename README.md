@@ -104,4 +104,4 @@ This is very new and I'm matching changes.
 Let me know if you'd like to see a feature or think there's a better way I can do something.
 
 Other approaches:
-* (pandas-ply)[http://pythonhosted.org/pandas-ply/]
+* [pandas-ply](http://pythonhosted.org/pandas-ply/)
