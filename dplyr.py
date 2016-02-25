@@ -14,14 +14,13 @@ from pandas import DataFrame
 
 
 # TODOs:
-# * Cast output from DplyFrame methods to be DplyFrame
-
 # * Refactor group_by
 # * make sure to implement reverse methods like "radd" so 1 + X.x will work
 # * Can we deal with cases x + y, where x does not have __add__ but y has __radd__?
 # * implement the other reverse methods
 
-# * diamonds | select(-X.cut)
+# * Descending and ascending for arrange
+# * diamonds >> select(-X.cut)
 # * Move special function Later code into Later object
 # * Add more tests
 # * Reflection thing in Later -- understand this better
@@ -38,6 +37,8 @@ from pandas import DataFrame
 # http://stackoverflow.com/questions/16372229/how-to-catch-any-method-called-on-an-object-in-python
 # Sort of define your own operators: http://code.activestate.com/recipes/384122/
 # http://pandas.pydata.org/pandas-docs/stable/internals.html
+# I think it might be possible to override __rrshift__ and possibly leave 
+#   the pandas dataframe entirely alone.
 
 
 class Manager(object):
@@ -141,6 +142,11 @@ class Later(object):
       self.todo.append(lambda df: df.__add__(arg))
     return self
 
+  # def __rrshift__(self, df):
+  #   otherDf = DplyFrame(df.copy(deep=True))
+  #   return self.applyFcns(otherDf)
+
+
 
 def CreateLaterFunction(fcn, *args, **kwargs):
   laterFcn = Later("_FUNCTION")
@@ -184,34 +190,11 @@ class DplyFrame(DataFrame):
     self.group_names = False
     self.groups = []
     if len(args) == 1 and isinstance(args[0], DplyFrame):
-      print args[0]._attr_names
-      print [getattr(args[0], attr) for attr in args[0]._attr_names]
       self._copy_attrs(args[0])
-    # if hasattr(df, "grouped"):
-    #   self.grouped = df.grouped
-    # else:
-    #   self.grouped = False
-    # if hasattr(df, "group_indices"):
-    #   self.group_indices = df.group_indices
-    # else:
-    #   self.group_indices = False
-    # if hasattr(df, "group_names"):
-    #   self.group_names = df.group_names
-    # else:
-    #   self.group_names = None
 
   def _copy_attrs(self, df):
     for attr in self._metadata:
       self.__dict__[attr] = getattr(df, attr, None)
-
-  # @property
-  # def _constructor(self):
-  #   # return DplyFrame
-  #   def f(*args, **kw):
-  #     df = DplyFrame(*args, **kw)
-  #     self._copy_attrs(df)
-  #     return df
-  #   return f
 
   @property
   def _constructor(self):
@@ -224,16 +207,6 @@ class DplyFrame(DataFrame):
       final_filter = final_filter & (self[name] == val)
     return final_filter
 
-  # def group_by(*args):
-  #   def GroupDF(df):
-  #     names = [arg.name for arg in args]
-  #     values = [set(df[name]) for name in names]  # use dplyr here?
-  #     df.group_indices = [CreateGroupIndices(df, names, v) for v in 
-  #         itertools.product(*values)]
-  #     df.grouped = True
-  #     return df
-  #   return GroupDF
-
   def group_self(self, names):
     values = [set(self[name]) for name in names]  # use dplyr here?
     self.group_indices = [self.CreateGroupIndices(names, v) for v in 
@@ -242,10 +215,8 @@ class DplyFrame(DataFrame):
     self.group_names = names
     self.group_values = values
 
-  def __or__(self, delayedFcn):
+  def __rshift__(self, delayedFcn):
     otherDf = DplyFrame(self.copy(deep=True))
-    otherDf.grouped = self.grouped  # TODO: this is bad to copy here!!
-    otherDf.group_indices = self.group_indices
 
     if type(delayedFcn) == Later:
       return delayedFcn.applyFcns(self)
@@ -304,7 +275,7 @@ def mutate(**kwargs):
 
 
 # TODO: might make sense to change this to pipeable thing
-# or use df | X._.head
+# or use df >> X._.head
 def head(n=10):
   return lambda df: df[:n]
 
