@@ -14,10 +14,9 @@ from pandas import DataFrame
 
 
 # TODOs:
-# * Refactor group_by
-
-# * use |X| ??
 # * Cast output from DplyFrame methods to be DplyFrame
+
+# * Refactor group_by
 # * make sure to implement reverse methods like "radd" so 1 + X.x will work
 # * Can we deal with cases x + y, where x does not have __add__ but y has __radd__?
 # * implement the other reverse methods
@@ -38,6 +37,7 @@ from pandas import DataFrame
 # https://mtomassoli.wordpress.com/2012/03/18/currying-in-python/
 # http://stackoverflow.com/questions/16372229/how-to-catch-any-method-called-on-an-object-in-python
 # Sort of define your own operators: http://code.activestate.com/recipes/384122/
+# http://pandas.pydata.org/pandas-docs/stable/internals.html
 
 
 class Manager(object):
@@ -175,22 +175,47 @@ def DelayFunction(fcn):
 
 
 class DplyFrame(DataFrame):
-  def __init__(self, df=None, **kwargs):
-    super(DplyFrame, self).__init__(df, **kwargs)
-    if hasattr(df, "grouped"):
-      self.grouped = df.grouped
-    else:
-      self.grouped = False
-    if hasattr(df, "group_indices"):
-      self.group_indices = df.group_indices
-    else:
-      self.group_indices = False
-    if hasattr(df, "group_names"):
-      self.group_names = df.group_names
-    else:
-      self.group_names = None
+  _metadata = ["grouped", "group_indices", "group_names", "groups"]
 
+  def __init__(self, *args, **kwargs):
+    super(DplyFrame, self).__init__(*args, **kwargs)
+    self.grouped = False
+    self.group_indices = []
+    self.group_names = False
     self.groups = []
+    if len(args) == 1 and isinstance(args[0], DplyFrame):
+      print args[0]._attr_names
+      print [getattr(args[0], attr) for attr in args[0]._attr_names]
+      self._copy_attrs(args[0])
+    # if hasattr(df, "grouped"):
+    #   self.grouped = df.grouped
+    # else:
+    #   self.grouped = False
+    # if hasattr(df, "group_indices"):
+    #   self.group_indices = df.group_indices
+    # else:
+    #   self.group_indices = False
+    # if hasattr(df, "group_names"):
+    #   self.group_names = df.group_names
+    # else:
+    #   self.group_names = None
+
+  def _copy_attrs(self, df):
+    for attr in self._metadata:
+      self.__dict__[attr] = getattr(df, attr, None)
+
+  # @property
+  # def _constructor(self):
+  #   # return DplyFrame
+  #   def f(*args, **kw):
+  #     df = DplyFrame(*args, **kw)
+  #     self._copy_attrs(df)
+  #     return df
+  #   return f
+
+  @property
+  def _constructor(self):
+    return DplyFrame
 
   def CreateGroupIndices(self, names, values):
     final_filter = pandas.Series([True for t in xrange(len(self))])

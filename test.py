@@ -102,7 +102,7 @@ class TestFilters(unittest.TestCase):
     diamonds_pd = self.diamonds.copy()
     diamonds_pd = diamonds_pd[diamonds_pd.cut == "Ideal"]
     diamonds_dp = self.diamonds | dfilter(X.cut == "Ideal")
-    self.assertTrue(diamonds_pd.equals(diamonds_dp))    
+    self.assertTrue(diamonds_pd.equals(diamonds_dp))
 
   def testFilterNone(self):
     diamonds_pd = self.diamonds.copy()
