@@ -3,6 +3,9 @@
 Welcome to Dplython: Dplyr for Python.
 The goal of this project is to implement the functionality of the R package Dplyr on top of Python's pandas.
 
+Dplyr: [Click here](https://cran.rstudio.com/web/packages/dplyr/vignettes/introduction.html)
+Pandas: [Click here](http://pandas.pydata.org/pandas-docs/stable/10min.html)
+
 This is version 0.0.1. 
 It's experimental and subject to change.
 
@@ -87,7 +90,7 @@ diamonds >> PairwiseGreater(X.x, X.y)
 # Passing entire dataframe into ggplot
 from ggplot import *
 ggplot = DelayFunction(ggplot)  # Simple installation
-diamonds = DplyFrame(pandas.read_csv('./diamonds.csv'))  # Masked my ggplot...
+diamonds = DplyFrame(pandas.read_csv('./diamonds.csv'))  # Masked in ggplot pkg
 (diamonds >> ggplot(aes(x="carat", y="price", color="cut"), data=X._) + 
   geom_point() + facet_wrap("color"))
 (diamonds >>
@@ -96,3 +99,9 @@ diamonds = DplyFrame(pandas.read_csv('./diamonds.csv'))  # Masked my ggplot...
     geom_point() + 
     facet_wrap("clarity"))
 ```
+
+This is very new and I'm matching changes. 
+Let me know if you'd like to see a feature or think there's a better way I can do something.
+
+Other approaches:
+* (pandas-ply)[http://pythonhosted.org/pandas-ply/]
