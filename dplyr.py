@@ -268,36 +268,9 @@ def mutate(**kwargs):
   return addColumns
 
 
-# TODO: might make sense to change this to pipeable thing
-# or use df >> X._.head
-def head(n=10):
-  return lambda df: df[:n]
-
-
-@DelayFunction
-def PairwiseGreater(series1, series2):
-  index = series1.index
-  newSeries = pandas.Series([max(s1, s2) for s1, s2 in zip(series1, series2)])
-  newSeries.index = index
-  return newSeries
-
-
-def CreateGroupIndices(df, names, values):
-  final_filter = pandas.Series([True for t in xrange(len(df))])
-  final_filter.index = df.index
-  for (name, val) in zip(names, values):
-    final_filter = final_filter & (df[name] == val)
-  return final_filter
-
-
 def group_by(*args):
   def GroupDF(df):
     df.group_self([arg.name for arg in args])
-    # names = [arg.name for arg in args]
-    # values = [set(df[name]) for name in names]  # use dplyr here?
-    # df.group_indices = [CreateGroupIndices(df, names, v) for v in 
-    #     itertools.product(*values)]
-    # df.grouped = True
     return df
   return GroupDF
 
@@ -332,6 +305,12 @@ def arrange(*args):
   return lambda df: DplyFrame(df.sort(names))
 
 
+# TODO: might make sense to change this to pipeable thing
+# or use df >> X._.head
+def head(n=10):
+  return lambda df: df[:n]
+
+
 def sample_n(n):
   # return X._.sample(n=n)
   return lambda df: DplyFrame(df.sample(n))
@@ -340,6 +319,14 @@ def sample_n(n):
 def sample_frac(frac):
   # return X._.sample(frac=frac)
   return lambda df: DplyFrame(df.sample(frac=frac))
+
+
+@DelayFunction
+def PairwiseGreater(series1, series2):
+  index = series1.index
+  newSeries = pandas.Series([max(s1, s2) for s1, s2 in zip(series1, series2)])
+  newSeries.index = index
+  return newSeries
 
 
 nrow = X._.__len__
