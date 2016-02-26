@@ -181,14 +181,14 @@ def DelayFunction(fcn):
 
 
 class DplyFrame(DataFrame):
-  _metadata = ["grouped", "group_indices", "group_names", "groups"]
+  # _metadata = ["grouped", "group_indices", "group_names", "groups"]
+  _metadata = ["_grouped_on", "_group_dict"]
 
   def __init__(self, *args, **kwargs):
     super(DplyFrame, self).__init__(*args, **kwargs)
-    self.grouped = False
-    self.group_indices = []
-    self.group_names = False
-    self.groups = []
+    self._grouped_on = None
+    self._group_dict = None
+    self._current_group = None
     if len(args) == 1 and isinstance(args[0], DplyFrame):
       self._copy_attrs(args[0])
 
@@ -208,12 +208,10 @@ class DplyFrame(DataFrame):
     return final_filter
 
   def group_self(self, names):
+    self._grouped_on = names
     values = [set(self[name]) for name in names]  # use dplyr here?
-    self.group_indices = [self.CreateGroupIndices(names, v) for v in 
-        itertools.product(*values)]
-    self.grouped = True
-    self.group_names = names
-    self.group_values = values
+    self._group_dict = {v: self.CreateGroupIndices(names, v) for v in 
+        itertools.product(*values)}
 
   def __rshift__(self, delayedFcn):
     otherDf = DplyFrame(self.copy(deep=True))
@@ -222,21 +220,17 @@ class DplyFrame(DataFrame):
       return delayedFcn.applyFcns(self)
 
     if delayedFcn == UngroupDF:
-      print "ungrouping..."
       return delayedFcn(otherDf)
 
-    if self.grouped:
-      print self.group_names
-      self.group_self(self.group_names)
-      groups = [otherDf[inds] for inds in self.group_indices]
-      group_dicts = [dict(zip(self.group_names, v)) for v in itertools.product(*self.group_values)]
-      for g, group_dict in zip(groups, group_dicts):  #TEMPHACK
-        g.group_dict = group_dict
-      groups = [delayedFcn(g) for g in groups]
+    if self._group_dict:
+      self.group_self(self._grouped_on)  # TODO: think about removing
+      groups = []
+      for group_vals, group_inds in self._group_dict.iteritems():
+        subsetDf = otherDf[group_inds]
+        subsetDf._current_group = dict(zip(self._grouped_on, group_vals))
+        groups.append(delayedFcn(subsetDf))
+
       outDf = DplyFrame(pandas.concat(groups))
-      outDf.grouped = True
-      outDf.group_indices = self.group_indices
-      outDf.group_names = self.group_names
       outDf.index = range(len(outDf))
       return outDf
     else:
@@ -313,16 +307,18 @@ def summarize(**kwargs):
     input_dict = {k: val.applyFcns(df) for k, val in kwargs.iteritems()}
     if len(input_dict) == 0:
       return DplyFrame({}, index=index)
-    if hasattr(df, 'group_dict'):
-      input_dict.update(df.group_dict)
+    if hasattr(df, '_current_group') and df._current_group:
+      input_dict.update(df._current_group)
     index = [0]
     return DplyFrame(input_dict, index=index)
   return CreateSummarizedDf
 
 
 def UngroupDF(df):
-  df.group_indices = []
-  df.grouped = False
+  df._grouped_on = None
+  df._group_dict = None
+  # df.group_indices = []
+  # df.grouped = False
   return df
 
 
