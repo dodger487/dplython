@@ -184,6 +184,15 @@ class TestGroupBy(unittest.TestCase):
                     dfilter(X.carat > 3.5, X.color != "I") >>
                     mutate(caratMean=X.carat.mean()))
 
+  def testGroupUngroupSummarize(self):
+    num_rows = (self.diamonds >> group_by(X.cut) >> ungroup() >> 
+                      summarize(total=X.price.sum()) >> nrow())
+    self.assertEquals(num_rows, 1)
+    sum_price = self.diamonds.sum()["price"]
+    sum_price_dp = (self.diamonds >> group_by(X.cut) >> ungroup() >> 
+                      summarize(total=X.price.sum()) >> X.total[0])
+    self.assertEquals(sum_price, sum_price_dp)
+
 
 class TestArrange(unittest.TestCase):
   diamonds = DplyFrame(pandas.read_csv('./diamonds.csv'))

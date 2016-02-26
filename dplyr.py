@@ -213,6 +213,19 @@ class DplyFrame(DataFrame):
     self._group_dict = {v: self.CreateGroupIndices(names, v) for v in 
         itertools.product(*values)}
 
+  def apply_on_groups(self, delayedFcn, otherDf):
+    self.group_self(self._grouped_on)  # TODO: think about removing
+    groups = []
+    for group_vals, group_inds in self._group_dict.iteritems():
+      subsetDf = otherDf[group_inds]
+      if len(subsetDf) > 0:
+        subsetDf._current_group = dict(zip(self._grouped_on, group_vals))
+        groups.append(delayedFcn(subsetDf))
+
+    outDf = DplyFrame(pandas.concat(groups))
+    outDf.index = range(len(outDf))
+    return outDf
+
   def __rshift__(self, delayedFcn):
     otherDf = DplyFrame(self.copy(deep=True))
 
@@ -223,15 +236,7 @@ class DplyFrame(DataFrame):
       return delayedFcn(otherDf)
 
     if self._group_dict:
-      self.group_self(self._grouped_on)  # TODO: think about removing
-      groups = []
-      for group_vals, group_inds in self._group_dict.iteritems():
-        subsetDf = otherDf[group_inds]
-        subsetDf._current_group = dict(zip(self._grouped_on, group_vals))
-        groups.append(delayedFcn(subsetDf))
-
-      outDf = DplyFrame(pandas.concat(groups))
-      outDf.index = range(len(outDf))
+      outDf = self.apply_on_groups(delayedFcn, otherDf)
       return outDf
     else:
       return DplyFrame(delayedFcn(otherDf))
