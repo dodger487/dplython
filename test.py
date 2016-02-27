@@ -72,6 +72,9 @@ class TestMutates(unittest.TestCase):
     diamonds_dp = self.diamonds >> mutate(avgX=(X.x + X.y).mean())
     self.assertTrue(diamonds_pd.equals(diamonds_dp))    
 
+  def testReverseThings(self):
+    self.diamonds >> mutate(foo=1 - X.carat, bar=7 // X.x, baz=4 % X.y.round())
+    
 
 class TestSelects(unittest.TestCase):
   diamonds = DplyFrame(pandas.read_csv('./diamonds.csv'))

@@ -14,10 +14,10 @@ from pandas import DataFrame
 
 
 # TODOs:
-# * Refactor group_by
 # * make sure to implement reverse methods like "radd" so 1 + X.x will work
 # * Can we deal with cases x + y, where x does not have __add__ but y has __radd__?
 # * implement the other reverse methods
+# * Can use __int__ (etc) with pandas.Series.astype
 
 # * Descending and ascending for arrange
 # * diamonds >> select(-X.cut)
@@ -39,6 +39,7 @@ from pandas import DataFrame
 # http://pandas.pydata.org/pandas-docs/stable/internals.html
 # I think it might be possible to override __rrshift__ and possibly leave 
 #   the pandas dataframe entirely alone.
+# http://www.rafekettler.com/magicmethods.html
 
 
 class Manager(object):
@@ -52,9 +53,40 @@ class Manager(object):
 X = Manager()
 
 
-operator_hooks = [name for name in dir(operator) if name.startswith('__') and 
-                  name.endswith('__')]
-operator_hooks.remove("__add__")
+reversible_operators = [
+  ["__add__", "__radd__"],
+  ["__sub__", "__rsub__"],
+  ["__mul__", "__rmul__"],
+  ["__floordiv__", "__rfloordiv__"],
+  ["__div__", "__rdiv__"],
+  ["__truediv__", "__rtruediv__"],
+  ["__mod__", "__rmod__"],
+  ["__divmod__", "__rdivmod__"],
+  ["__pow__", "__rpow__"],
+  ["__lshift__", "__rlshift__"],
+  ["__rshift__", "__rrshift__"],
+  ["__and__", "__rand__"],
+  ["__or__", "__ror__"],
+  ["__xor__", "__rxor__"],
+]
+
+normal_operators = [
+    "__abs__", "__concat__", "__contains__", "__delitem__", "__delslice__",
+    "__eq__", "__file__", "__ge__", "__getitem__", "__getslice__", "__gt__", 
+    "__iadd__", "__iand__", "__iconcat__", "__idiv__", "__ifloordiv__", 
+    "__ilshift__", "__imod__", "__imul__", "__index__", "__inv__", "__invert__",
+    "__ior__", "__ipow__", "__irepeat__", "__irshift__", "__isub__", 
+    "__itruediv__", "__ixor__", "__le__", "__lt__", "__ne__", "__neg__",
+    "__not__", "__package__", "__pos__", "__repeat__", "__setitem__",
+    "__setslice__", "__radd__", "__rsub__", "__rmul__", "__rfloordiv__",
+    "__rdiv__", "__rtruediv__", "__rmod__", "__rdivmod__", "__rpow__", 
+    "__rlshift__", "__rrshift__",  "__rand__",  "__ror__",  "__rxor__", 
+]
+
+
+# operator_hooks = [name for name in dir(operator) if name.startswith('__') and 
+#                   name.endswith('__')]
+# operator_hooks.remove("__add__")
 
 
 def instrument_operator_hooks(cls):
@@ -82,7 +114,7 @@ def instrument_operator_hooks(cls):
       print "Skipping", name
       pass  # skip __name__ and __doc__ and the like
 
-  for hook_name in operator_hooks:
+  for hook_name in normal_operators:
     print "Adding hook to", hook_name
     add_hook(hook_name)
   return cls
@@ -96,7 +128,7 @@ class Later(object):
       self.todo = [lambda df: df]
     else:
       self.todo = [lambda df: df[self.name]]
-
+  
   def applyFcns(self, df):
     self.origDf = df
     stmt = df
@@ -113,26 +145,29 @@ class Later(object):
     self.todo.append(lambda foo: foo.__call__(*args, **kwargs))
     return self
 
-  def __add__(self, arg):
-    print "special add"
-    def TryRaddIfNoAdd(df):
-      if "__add__" in dir(df):
-        return df.__add__(arg)
-      else:
-        return arg.__radd__(df)
-    def TryRaddIfNoAddLater(df):
-      if "__add__" in dir(df):
-        return df.__add__(arg.applyFcns(self.origDf))
-      else:
-        return arg.applyFcns(self.origDf).__radd__(df)
+  # def __add__(self, arg):
+  #   print "special add"
+  #   func_name = "__add__"
+  #   rfunc_name = "__radd__"
+  #   def TryReverseIfNoRegular(df):
+  #     if func_name in dir(df):
+  #       return getattr(df, func_name)(arg)
+  #     else:
+  #       return getattr(arg, rfunc_name)(df)
+  #   def TryReverseIfNoRegularLater(df):
+  #     if func_name in dir(df):
+  #       return getattr(df, func_name)(arg.applyFcns(self.origDf))
+  #     else:
+  #       return getattr(arg.applyFcns(self.origDf), rfunc_name)(df)
+  #       # return arg.applyFcns(self.origDf).__radd__(df)
     
-    if type(arg) == Later:
-      self.todo.append(TryRaddIfNoAddLater)
-      # self.todo.append(lambda df: df.__add__(arg.applyFcns(self.origDf)))
-    else:  
-      self.todo.append(TryRaddIfNoAdd)
-      # self.todo.append(lambda df: df.__add__(arg))
-    return self
+  #   if type(arg) == Later:
+  #     self.todo.append(TryReverseIfNoRegularLater)
+  #     # self.todo.append(lambda df: df.__add__(arg.applyFcns(self.origDf)))
+  #   else:  
+  #     self.todo.append(TryReverseIfNoRegular)
+  #     # self.todo.append(lambda df: df.__add__(arg))
+  #   return self
 
   # TODO: need to implement the other reverse methods
   def __radd__(self, arg):
@@ -145,6 +180,65 @@ class Later(object):
   # def __rrshift__(self, df):
   #   otherDf = DplyFrame(df.copy(deep=True))
   #   return self.applyFcns(otherDf)
+
+def create_reversible_func(func_name, rfunc_name):
+  def special_add(self, arg):
+    def TryReverseIfNoRegular(df):
+      if func_name in dir(df):
+        return getattr(df, func_name)(arg)
+      else:
+        return getattr(arg, rfunc_name)(df)
+
+    def TryReverseIfNoRegularLater(df):
+      if func_name in dir(df):
+        return getattr(df, func_name)(arg.applyFcns(self.origDf))
+      else:
+        return getattr(arg.applyFcns(self.origDf), rfunc_name)(df)
+
+    if type(arg) == Later:
+      self.todo.append(TryReverseIfNoRegularLater)
+    else:  
+      self.todo.append(TryReverseIfNoRegular)
+    return self
+  return special_add
+
+for func_name, rfunc_name in reversible_operators:
+  setattr(Later, func_name, create_reversible_func(func_name, rfunc_name))
+
+# for hook_name in reversible_operators:
+#   print "Adding hook to", hook_name
+#     def TryRaddIfNoAdd(df):
+#       if "__add__" in dir(df):
+#         return df.__add__(arg)
+#       else:
+#         return arg.__radd__(df)
+#     def TryRaddIfNoAddLater(df):
+#       if "__add__" in dir(df):
+#         return df.__add__(arg.applyFcns(self.origDf))
+#       else:
+#         return arg.applyFcns(self.origDf).__radd__(df)
+    
+#     if type(arg) == Later:
+#       self.todo.append(TryRaddIfNoAddLater)
+#       # self.todo.append(lambda df: df.__add__(arg.applyFcns(self.origDf)))
+#     else:  
+#       self.todo.append(TryRaddIfNoAdd)
+
+#   add_hook(hook_name)
+
+#       if len(args) > 0 and type(args[0]) == Later:
+#         self.todo.append(lambda df: getattr(df, name)(args[0].applyFcns(self.origDf)))
+#       else:  
+#         self.todo.append(lambda df: getattr(df, name)(*args, **kw))
+#       return self
+
+#     try:
+#       setattr(cls, name, op_hook)
+#     except (AttributeError, TypeError):
+#       print "Skipping", name
+#       pass  # skip __name__ and __doc__ and the like
+
+
 
 
 
@@ -167,21 +261,7 @@ def CreateLaterFunction(fcn, *args, **kwargs):
   return laterFcn
   
 
-def DelayFunction(fcn):
-  def DelayedFcnCall(*args, **kwargs):
-    # Check to see if any args or kw are Later. If not, return normal fcn.
-    checkIfLater = lambda x: type(x) == Later
-    if (len(filter(checkIfLater, args)) == 0 and 
-        len(filter(checkIfLater, kwargs.values())) == 0):
-      return fcn(*args, **kwargs)
-    else:
-      return CreateLaterFunction(fcn, *args, **kwargs)
-
-  return DelayedFcnCall
-
-
 class DplyFrame(DataFrame):
-  # _metadata = ["grouped", "group_indices", "group_names", "groups"]
   _metadata = ["_grouped_on", "_group_dict"]
 
   def __init__(self, *args, **kwargs):
@@ -295,8 +375,6 @@ def summarize(**kwargs):
 def UngroupDF(df):
   df._grouped_on = None
   df._group_dict = None
-  # df.group_indices = []
-  # df.grouped = False
   return df
 
 
@@ -324,6 +402,19 @@ def sample_n(n):
 def sample_frac(frac):
   # return X._.sample(frac=frac)
   return lambda df: DplyFrame(df.sample(frac=frac))
+
+
+def DelayFunction(fcn):
+  def DelayedFcnCall(*args, **kwargs):
+    # Check to see if any args or kw are Later. If not, return normal fcn.
+    checkIfLater = lambda x: type(x) == Later
+    if (len(filter(checkIfLater, args)) == 0 and 
+        len(filter(checkIfLater, kwargs.values())) == 0):
+      return fcn(*args, **kwargs)
+    else:
+      return CreateLaterFunction(fcn, *args, **kwargs)
+
+  return DelayedFcnCall
 
 
 @DelayFunction
