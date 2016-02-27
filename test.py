@@ -74,7 +74,7 @@ class TestMutates(unittest.TestCase):
 
   def testReverseThings(self):
     self.diamonds >> mutate(foo=1 - X.carat, bar=7 // X.x, baz=4 % X.y.round())
-    
+
 
 class TestSelects(unittest.TestCase):
   diamonds = DplyFrame(pandas.read_csv('./diamonds.csv'))
@@ -283,6 +283,22 @@ class TestSummarize(unittest.TestCase):
     for i, j in zip(val_pd, valX_dp):
       self.assertEquals(round(i), round(j))
     
+
+class TestAlternateAttrGrab(unittest.TestCase):
+  diamonds = DplyFrame(pandas.read_csv('./diamonds.csv'))
+  diamonds["o m g"] = range(len(diamonds))
+  diamonds["0"] = range(len(diamonds))
+
+  def testSelect(self):
+    equality = self.diamonds[["o m g"]] == (self.diamonds >> select(X["o m g"]))
+    self.assertTrue(equality.all()[0])
+
+  def testMutate(self):
+    pd = self.diamonds[["0"]] * 2
+    dp = self.diamonds >> mutate(foo=X["0"]*2) >> select(X.foo)
+    equality = pd["0"] == dp["foo"]
+    self.assertTrue(equality.all())
+
 
 if __name__ == '__main__':
   unittest.main()

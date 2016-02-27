@@ -46,8 +46,8 @@ class Manager(object):
   def __getattr__(self, attr):
     return Later(attr)
 
-  # def __getitem__(self, key):
-  #   return Later(key)
+  def __getitem__(self, key):
+    return Later(key)
 
 
 X = Manager()

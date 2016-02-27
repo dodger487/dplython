@@ -3,8 +3,8 @@
 Welcome to Dplython: Dplyr for Python.
 The goal of this project is to implement the functionality of the R package Dplyr on top of Python's pandas.
 
-Dplyr: [Click here](https://cran.rstudio.com/web/packages/dplyr/vignettes/introduction.html)
-Pandas: [Click here](http://pandas.pydata.org/pandas-docs/stable/10min.html)
+* Dplyr: [Click here](https://cran.rstudio.com/web/packages/dplyr/vignettes/introduction.html)
+* Pandas: [Click here](http://pandas.pydata.org/pandas-docs/stable/10min.html)
 
 This is version 0.0.1. 
 It's experimental and subject to change.
@@ -57,6 +57,7 @@ Out:
   group_by(X.cut, X.carat_bin) >> 
   summarize(avg_price=X.price.mean()))
 """
+Out:
        avg_price  carat_bin        cut
 0     863.908535          0      Ideal
 1    4213.864948          1      Ideal
@@ -67,10 +68,29 @@ Out:
 29  18018.000000          5       Fair
 """
 
+# If you have column names that don't work as attributes, you can use an 
+# alternate "get item" notation with X.
+diamonds["column w/ spaces"] = range(len(diamonds))
+diamonds >> select(X["column w/ spaces"]) >> head()
+"""
+Out:
+   column w/ spaces
+0                 0
+1                 1
+2                 2
+3                 3
+4                 4
+5                 5
+6                 6
+7                 7
+8                 8
+9                 9
+"""
+
 # It's possible to pass the entire dataframe using X._ 
 diamonds >> sample_n(6) >> select(X.carat, X.price) >> X._.T
 """
-Out[13]:
+Out:
          18966    19729   9445   49951    3087    33128
 carat     1.16     1.52     0.9    0.3     0.74    0.31
 price  7803.00  8299.00  4593.0  540.0  3315.00  816.00
