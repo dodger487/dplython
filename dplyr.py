@@ -14,10 +14,9 @@ from pandas import DataFrame
 
 
 # TODOs:
-# * make sure to implement reverse methods like "radd" so 1 + X.x will work
-# * Can we deal with cases x + y, where x does not have __add__ but y has __radd__?
-# * implement the other reverse methods
 # * Can use __int__ (etc) with pandas.Series.astype
+
+# add len to Later
 
 # * Descending and ascending for arrange
 # * diamonds >> select(-X.cut)
@@ -54,20 +53,20 @@ X = Manager()
 
 
 reversible_operators = [
-  ["__add__", "__radd__"],
-  ["__sub__", "__rsub__"],
-  ["__mul__", "__rmul__"],
-  ["__floordiv__", "__rfloordiv__"],
-  ["__div__", "__rdiv__"],
-  ["__truediv__", "__rtruediv__"],
-  ["__mod__", "__rmod__"],
-  ["__divmod__", "__rdivmod__"],
-  ["__pow__", "__rpow__"],
-  ["__lshift__", "__rlshift__"],
-  ["__rshift__", "__rrshift__"],
-  ["__and__", "__rand__"],
-  ["__or__", "__ror__"],
-  ["__xor__", "__rxor__"],
+    ["__add__", "__radd__"],
+    ["__sub__", "__rsub__"],
+    ["__mul__", "__rmul__"],
+    ["__floordiv__", "__rfloordiv__"],
+    ["__div__", "__rdiv__"],
+    ["__truediv__", "__rtruediv__"],
+    ["__mod__", "__rmod__"],
+    ["__divmod__", "__rdivmod__"],
+    ["__pow__", "__rpow__"],
+    ["__lshift__", "__rlshift__"],
+    ["__rshift__", "__rrshift__"],
+    ["__and__", "__rand__"],
+    ["__or__", "__ror__"],
+    ["__xor__", "__rxor__"],
 ]
 
 normal_operators = [
@@ -80,28 +79,31 @@ normal_operators = [
     "__not__", "__package__", "__pos__", "__repeat__", "__setitem__",
     "__setslice__", "__radd__", "__rsub__", "__rmul__", "__rfloordiv__",
     "__rdiv__", "__rtruediv__", "__rmod__", "__rdivmod__", "__rpow__", 
-    "__rlshift__", "__rrshift__",  "__rand__",  "__ror__",  "__rxor__", 
+    "__rlshift__",  "__rand__",  "__ror__",  "__rxor__",  # "__rrshift__",
 ]
 
 
 # operator_hooks = [name for name in dir(operator) if name.startswith('__') and 
 #                   name.endswith('__')]
-# operator_hooks.remove("__add__")
+def create_reversible_func(func_name, rfunc_name):
+  def reversible_func(self, arg):
+    def TryReverseIfNoRegular(df):
+      if func_name in dir(df) and type(arg) == Later:
+        return getattr(df, func_name)(arg.applyFcns(self.origDf))
+      elif func_name in dir(df) and type(arg) != Later:
+        return getattr(df, func_name)(arg)
+      elif func_name not in dir(df) and type(arg) == Later:
+        return getattr(arg.applyFcns(self.origDf), rfunc_name)(df)
+      else:
+        return getattr(arg, rfunc_name)(df)
+    self.todo.append(TryReverseIfNoRegular)
+    return self
+  return reversible_func
 
 
 def instrument_operator_hooks(cls):
   def add_hook(name):
-    operator_func = getattr(operator, name.strip('_'), None)
-    existing = getattr(cls, name, None)
-
     def op_hook(self, *args, **kw):
-      print "Hooking into {}".format(name)
-      self._function = operator_func
-      self._params = (args, kw)
-      print args
-      # if existing is not None:
-      #   return existing(self, *args, **kw)
-      # TODO: multiple arguments...
       if len(args) > 0 and type(args[0]) == Later:
         self.todo.append(lambda df: getattr(df, name)(args[0].applyFcns(self.origDf)))
       else:  
@@ -111,12 +113,14 @@ def instrument_operator_hooks(cls):
     try:
       setattr(cls, name, op_hook)
     except (AttributeError, TypeError):
-      print "Skipping", name
       pass  # skip __name__ and __doc__ and the like
 
   for hook_name in normal_operators:
-    print "Adding hook to", hook_name
     add_hook(hook_name)
+
+  for func_name, rfunc_name in reversible_operators:
+    setattr(cls, func_name, create_reversible_func(func_name, rfunc_name))
+
   return cls
 
 
@@ -133,7 +137,6 @@ class Later(object):
     self.origDf = df
     stmt = df
     for func in self.todo:
-      print func
       stmt = func(stmt)
     return stmt
     
@@ -145,100 +148,9 @@ class Later(object):
     self.todo.append(lambda foo: foo.__call__(*args, **kwargs))
     return self
 
-  # def __add__(self, arg):
-  #   print "special add"
-  #   func_name = "__add__"
-  #   rfunc_name = "__radd__"
-  #   def TryReverseIfNoRegular(df):
-  #     if func_name in dir(df):
-  #       return getattr(df, func_name)(arg)
-  #     else:
-  #       return getattr(arg, rfunc_name)(df)
-  #   def TryReverseIfNoRegularLater(df):
-  #     if func_name in dir(df):
-  #       return getattr(df, func_name)(arg.applyFcns(self.origDf))
-  #     else:
-  #       return getattr(arg.applyFcns(self.origDf), rfunc_name)(df)
-  #       # return arg.applyFcns(self.origDf).__radd__(df)
-    
-  #   if type(arg) == Later:
-  #     self.todo.append(TryReverseIfNoRegularLater)
-  #     # self.todo.append(lambda df: df.__add__(arg.applyFcns(self.origDf)))
-  #   else:  
-  #     self.todo.append(TryReverseIfNoRegular)
-  #     # self.todo.append(lambda df: df.__add__(arg))
-  #   return self
-
-  # TODO: need to implement the other reverse methods
-  def __radd__(self, arg):
-    if type(arg) == Later:
-      self.todo.append(lambda df: df.__add__(arg.applyFcns(self.origDf)))
-    else:  
-      self.todo.append(lambda df: df.__add__(arg))
-    return self
-
-  # def __rrshift__(self, df):
-  #   otherDf = DplyFrame(df.copy(deep=True))
-  #   return self.applyFcns(otherDf)
-
-def create_reversible_func(func_name, rfunc_name):
-  def special_add(self, arg):
-    def TryReverseIfNoRegular(df):
-      if func_name in dir(df):
-        return getattr(df, func_name)(arg)
-      else:
-        return getattr(arg, rfunc_name)(df)
-
-    def TryReverseIfNoRegularLater(df):
-      if func_name in dir(df):
-        return getattr(df, func_name)(arg.applyFcns(self.origDf))
-      else:
-        return getattr(arg.applyFcns(self.origDf), rfunc_name)(df)
-
-    if type(arg) == Later:
-      self.todo.append(TryReverseIfNoRegularLater)
-    else:  
-      self.todo.append(TryReverseIfNoRegular)
-    return self
-  return special_add
-
-for func_name, rfunc_name in reversible_operators:
-  setattr(Later, func_name, create_reversible_func(func_name, rfunc_name))
-
-# for hook_name in reversible_operators:
-#   print "Adding hook to", hook_name
-#     def TryRaddIfNoAdd(df):
-#       if "__add__" in dir(df):
-#         return df.__add__(arg)
-#       else:
-#         return arg.__radd__(df)
-#     def TryRaddIfNoAddLater(df):
-#       if "__add__" in dir(df):
-#         return df.__add__(arg.applyFcns(self.origDf))
-#       else:
-#         return arg.applyFcns(self.origDf).__radd__(df)
-    
-#     if type(arg) == Later:
-#       self.todo.append(TryRaddIfNoAddLater)
-#       # self.todo.append(lambda df: df.__add__(arg.applyFcns(self.origDf)))
-#     else:  
-#       self.todo.append(TryRaddIfNoAdd)
-
-#   add_hook(hook_name)
-
-#       if len(args) > 0 and type(args[0]) == Later:
-#         self.todo.append(lambda df: getattr(df, name)(args[0].applyFcns(self.origDf)))
-#       else:  
-#         self.todo.append(lambda df: getattr(df, name)(*args, **kw))
-#       return self
-
-#     try:
-#       setattr(cls, name, op_hook)
-#     except (AttributeError, TypeError):
-#       print "Skipping", name
-#       pass  # skip __name__ and __doc__ and the like
-
-
+  def __rrshift__(self, df):
+    otherDf = DplyFrame(df.copy(deep=True))
+    return self.applyFcns(otherDf)
 
 
 
@@ -254,12 +166,23 @@ def CreateLaterFunction(fcn, *args, **kwargs):
         for a in self.args]
     kwargs = {k: v.applyFcns(self.origDf) if type(v) == Later else v 
         for k, v in self.kwargs.iteritems()}
-    print args
-    print kwargs
     return self.fcn(*args, **kwargs)
   laterFcn.todo = [lambda df: apply_function(laterFcn, df)]
   return laterFcn
   
+
+def DelayFunction(fcn):
+  def DelayedFcnCall(*args, **kwargs):
+    # Check to see if any args or kw are Later. If not, return normal fcn.
+    checkIfLater = lambda x: type(x) == Later
+    if (len(filter(checkIfLater, args)) == 0 and 
+        len(filter(checkIfLater, kwargs.values())) == 0):
+      return fcn(*args, **kwargs)
+    else:
+      return CreateLaterFunction(fcn, *args, **kwargs)
+
+  return DelayedFcnCall
+
 
 class DplyFrame(DataFrame):
   _metadata = ["_grouped_on", "_group_dict"]
@@ -329,7 +252,6 @@ def dfilter(*args):
     final_filter.index = df.index
     for arg in args:
       stmt = arg.applyFcns(df)
-      print stmt
       final_filter = final_filter & stmt
     if final_filter.dtype != bool:
       raise Exception("Inputs to filter must be boolean")
@@ -337,9 +259,13 @@ def dfilter(*args):
   return f
 
 
+# @DelayFunction
 def select(*args):
   names = [column.name for column in args]
-  return lambda df: df[names]
+  return X._[[column.name for column in args]]
+  # def get_names(df): return df[names]
+  # return get_names(names)
+  # return DelayFunction(lambda df: df[names])
 
 
 def mutate(**kwargs):
@@ -390,8 +316,9 @@ def arrange(*args):
 
 # TODO: might make sense to change this to pipeable thing
 # or use df >> X._.head
-def head(n=10):
-  return lambda df: df[:n]
+def head(*args, **kwargs):
+  return X._.head(*args, **kwargs)
+  # return lambda df: df.head(*args, **kwargs)
 
 
 def sample_n(n):
@@ -404,17 +331,11 @@ def sample_frac(frac):
   return lambda df: DplyFrame(df.sample(frac=frac))
 
 
-def DelayFunction(fcn):
-  def DelayedFcnCall(*args, **kwargs):
-    # Check to see if any args or kw are Later. If not, return normal fcn.
-    checkIfLater = lambda x: type(x) == Later
-    if (len(filter(checkIfLater, args)) == 0 and 
-        len(filter(checkIfLater, kwargs.values())) == 0):
-      return fcn(*args, **kwargs)
-    else:
-      return CreateLaterFunction(fcn, *args, **kwargs)
+def sample(*args, **kwargs):
+  return X._.sample(*args, **kwargs)
 
-  return DelayedFcnCall
+
+nrow = X._.__len__
 
 
 @DelayFunction
@@ -423,6 +344,3 @@ def PairwiseGreater(series1, series2):
   newSeries = pandas.Series([max(s1, s2) for s1, s2 in zip(series1, series2)])
   newSeries.index = index
   return newSeries
-
-
-nrow = X._.__len__
