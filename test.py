@@ -8,7 +8,7 @@ import unittest
 
 import pandas
 
-from dplyr import *
+from dplython import *
 
 
 class TestMutates(unittest.TestCase):

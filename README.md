@@ -10,7 +10,7 @@ This is version 0.0.1.
 It's experimental and subject to change.
 
 ```python
-from dplyr import *
+from dplython import *
 
 diamonds = DplyFrame(pandas.read_csv('./diamonds.csv'))
 
