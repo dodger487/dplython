@@ -1,6 +1,11 @@
-## Dplython: Dplyr for Python
+# Dplython: Dplyr for Python
 
 Welcome to Dplython: Dplyr for Python.
+
+Dplyr is a library for the language R designed to make data analysis fast and easy.
+The philosophy of Dplyr is to constrain data manipulation to a few simple functions that correspond to the most common tasks.
+This maps thinking closer to the process of writing code, helping you move closer to analyze data at the "speed of thought".
+
 The goal of this project is to implement the functionality of the R package Dplyr on top of Python's pandas.
 
 * Dplyr: [Click here](https://cran.rstudio.com/web/packages/dplyr/vignettes/introduction.html)
@@ -9,6 +14,13 @@ The goal of this project is to implement the functionality of the R package Dply
 This is version 0.0.1. 
 It's experimental and subject to change.
 
+## Installation
+To install, use this command or clone the repository.
+```
+pip install git+https://github.com/dodger487/dplython.git
+```
+
+## Example usage
 ```python
 from dplython import *
 
@@ -152,7 +164,7 @@ I wrote this for Python 2.7 because I'm a bad person.
 Python 3 version coming soon.
 Let me know if you'd like to see a feature or think there's a better way I can do something.
 
-Other approaches:
+## Other approaches
 * [pandas-ply](http://pythonhosted.org/pandas-ply/)
 
 Development of dplython began before I knew pandas-ply existed.
