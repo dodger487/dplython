@@ -12,24 +12,12 @@ It's experimental and subject to change.
 ```python
 from dplython import *
 
-diamonds = DplyFrame(pandas.read_csv('./diamonds.csv'))
+# The example `diamonds` DataFrame is included in this package, but you can 
+# cast a DataFrame to a DplyFrame in this simple way:
+# diamonds = DplyFrame(pandas.read_csv('./diamonds.csv'))
 
-diamonds >> select(X.cut) >> head()
-"""
-Out:
-         cut
-0      Ideal
-1    Premium
-2       Good
-3    Premium
-4       Good
-5  Very Good
-6  Very Good
-7  Very Good
-8       Fair
-9  Very Good
-"""
-
+# Select specific columns of the DataFrame using select, and 
+#   get the first few using head
 diamonds >> select(X.carat, X.cut, X.price) >> head(5)
 """
 Out:
@@ -41,6 +29,7 @@ Out:
 4   0.31       Good    335
 """
 
+# Filter out rows using dfilter
 diamonds >> dfilter(X.carat > 4) >> select(X.carat, X.cut, X.depth, X.price)
 """
 Out:
@@ -52,6 +41,30 @@ Out:
 27630   4.50     Fair   65.8  18531
 """
 
+# Sample with sample_n or sample_frac, sort with arrange
+(diamonds >> 
+  sample_n(10) >> 
+  arrange(X.carat) >> 
+  select(X.carat, X.cut, X.depth, X.price))
+"""
+Out:
+       carat        cut  depth  price
+37277   0.23  Very Good   61.5    484
+17728   0.30  Very Good   58.8    614
+33255   0.32      Ideal   61.1    825
+38911   0.33      Ideal   61.6   1052
+31491   0.34    Premium   60.3    765
+37227   0.40    Premium   61.9    975
+2578    0.81    Premium   60.8   3213
+15888   1.01       Fair   64.6   6353
+26594   1.74      Ideal   62.9  16316
+25727   2.38    Premium   62.4  14648
+"""
+
+# You can: 
+#   add columns with mutate (referencing other columns!)
+#   group rows into dplyr-style groups with group_by
+#   collapse rows into single rows using sumarize
 (diamonds >> 
   mutate(carat_bin=X.carat.round()) >> 
   group_by(X.cut, X.carat_bin) >> 
@@ -107,21 +120,45 @@ def PairwiseGreater(series1, series2):
 diamonds >> PairwiseGreater(X.x, X.y)
 
 
-# Passing entire dataframe into ggplot
+# Passing entire dataframe and plotting with ggplot
 from ggplot import *
 ggplot = DelayFunction(ggplot)  # Simple installation
 diamonds = DplyFrame(pandas.read_csv('./diamonds.csv'))  # Masked in ggplot pkg
 (diamonds >> ggplot(aes(x="carat", y="price", color="cut"), data=X._) + 
   geom_point() + facet_wrap("color"))
+```
+![Ggplot example 1](http://dodger487.github.com/figs/dplython/ggplot_img1.png)
+
+```python
 (diamonds >>
   dfilter((X.clarity == "I1") | (X.clarity == "IF")) >> 
   ggplot(aes(x="carat", y="price", color="color"), X._) + 
     geom_point() + 
     facet_wrap("clarity"))
 ```
+![Ggplot example 2](http://dodger487.github.com/figs/dplython/ggplot_img2.png)
 
-This is very new and I'm matching changes. 
+```python
+# Matplotlib works as well!
+import pylab as pl
+pl.scatter = DelayFunction(pl.scatter)
+diamonds >> sample_frac(0.1) >> pl.scatter(X.carat, X.price)
+```
+![MPL example 2](http://dodger487.github.com/figs/dplython/plt_img1.png)
+
+
+This is very new and I'm matching changes.
+I wrote this for Python 2.7 because I'm a bad person.
+Python 3 version coming soon.
 Let me know if you'd like to see a feature or think there's a better way I can do something.
 
 Other approaches:
 * [pandas-ply](http://pythonhosted.org/pandas-ply/)
+
+Development of dplython began before I knew pandas-ply existed.
+After I found it, I chose "X" as the manager to be consistent.
+Pandas-ply is a great approach and worth taking a look.
+The main contrasts between the two are that:
+* dplython uses dplyr-style groups, as opposed to the SQL-style groups of pandas and pandas-ply
+* dplython maps a little more directly onto dplyr, for example having mutate instead of an expanded select.
+* Use of operators to connect operations instead of method-chaining
