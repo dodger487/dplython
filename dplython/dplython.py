@@ -13,6 +13,9 @@ import pandas
 from pandas import DataFrame
 
 
+__version__ = "0.0.1"
+
+
 # TODOs:
 # add len to Later
 
