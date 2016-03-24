@@ -54,6 +54,8 @@ class TestMutates(unittest.TestCase):
     diamonds_pd["copy_x"] = diamonds_pd["x"]
     diamonds_pd["copy_y"] = diamonds_pd["y"]
     diamonds_dp = self.diamonds >> mutate(copy_x=X.x, copy_y=X.y)
+    # Keep the new DplyFrame columns in the original order
+    diamonds_dp = diamonds_dp[diamonds_pd.columns]
     self.assertTrue(diamonds_pd.equals(diamonds_dp))    
 
   def test_combine(self):
