@@ -160,8 +160,6 @@ diamonds >> sample_frac(0.1) >> pl.scatter(X.carat, X.price)
 
 
 This is very new and I'm matching changes.
-I wrote this for Python 2.7 because I'm a bad person.
-Python 3 version coming soon.
 Let me know if you'd like to see a feature or think there's a better way I can do something.
 
 ## Other approaches
