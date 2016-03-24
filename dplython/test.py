@@ -5,14 +5,21 @@
 
 import math
 import unittest
+import os
 
-import pandas
+import pandas as pd
 
 from dplython import *
 
 
+def load_diamonds():
+    root = os.path.abspath(os.path.dirname(__file__))
+    path = os.path.join(root, 'data', 'diamonds.csv')
+    return DplyFrame(pd.read_csv(path))
+
+
 class TestMutates(unittest.TestCase):
-  diamonds = DplyFrame(pandas.read_csv('./diamonds.csv'))
+  diamonds = load_diamonds()
 
   def test_equality(self):
     self.assertTrue(self.diamonds.equals(self.diamonds))
@@ -47,6 +54,8 @@ class TestMutates(unittest.TestCase):
     diamonds_pd["copy_x"] = diamonds_pd["x"]
     diamonds_pd["copy_y"] = diamonds_pd["y"]
     diamonds_dp = self.diamonds >> mutate(copy_x=X.x, copy_y=X.y)
+    # Keep the new DplyFrame columns in the original order
+    diamonds_dp = diamonds_dp[diamonds_pd.columns]
     self.assertTrue(diamonds_pd.equals(diamonds_dp))    
 
   def test_combine(self):
@@ -77,7 +86,7 @@ class TestMutates(unittest.TestCase):
 
 
 class TestSelects(unittest.TestCase):
-  diamonds = DplyFrame(pandas.read_csv('./diamonds.csv'))
+  diamonds = load_diamonds()
 
   def testOne(self):
     diamonds_pd = self.diamonds.copy()
@@ -99,7 +108,7 @@ class TestSelects(unittest.TestCase):
 
 
 class TestFilters(unittest.TestCase):
-  diamonds = DplyFrame(pandas.read_csv('./diamonds.csv'))
+  diamonds = load_diamonds()
 
   def testFilterEasy(self):
     diamonds_pd = self.diamonds.copy()
@@ -144,7 +153,7 @@ class TestFilters(unittest.TestCase):
 
 
 class TestGroupBy(unittest.TestCase):
-  diamonds = DplyFrame(pandas.read_csv('./diamonds.csv'))
+  diamonds = load_diamonds()
 
   def testGroupbyDoesntDie(self):
     self.diamonds >> group_by(X.color)
@@ -198,7 +207,7 @@ class TestGroupBy(unittest.TestCase):
 
 
 class TestArrange(unittest.TestCase):
-  diamonds = DplyFrame(pandas.read_csv('./diamonds.csv'))
+  diamonds = load_diamonds()
 
   def testArrangeDoesntDie(self):
     self.diamonds >> arrange(X.cut)
@@ -221,7 +230,7 @@ class TestArrange(unittest.TestCase):
 
 
 class TestSample(unittest.TestCase):
-  diamonds = DplyFrame(pandas.read_csv('./diamonds.csv'))
+  diamonds = load_diamonds()
 
   def testSamplesDontDie(self):
     self.diamonds >> sample_n(5)
@@ -261,7 +270,7 @@ class TestSample(unittest.TestCase):
 
 
 class TestSummarize(unittest.TestCase):
-  diamonds = DplyFrame(pandas.read_csv('./diamonds.csv'))
+  diamonds = load_diamonds()
 
   def testSummarizeDoesntDie(self):
     self.diamonds >> summarize(sumX=X.x.sum())
@@ -282,10 +291,10 @@ class TestSummarize(unittest.TestCase):
     valX_dp.sort()
     for i, j in zip(val_pd, valX_dp):
       self.assertEquals(round(i), round(j))
-    
+
 
 class TestAlternateAttrGrab(unittest.TestCase):
-  diamonds = DplyFrame(pandas.read_csv('./diamonds.csv'))
+  diamonds = load_diamonds()
   diamonds["o m g"] = range(len(diamonds))
   diamonds["0"] = range(len(diamonds))
 
