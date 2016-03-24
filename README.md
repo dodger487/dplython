@@ -11,7 +11,7 @@ The goal of this project is to implement the functionality of the R package Dply
 * Dplyr: [Click here](https://cran.rstudio.com/web/packages/dplyr/vignettes/introduction.html)
 * Pandas: [Click here](http://pandas.pydata.org/pandas-docs/stable/10min.html)
 
-This is version 0.0.1. 
+This is version 0.0.2. 
 It's experimental and subject to change.
 
 ## Installation

@@ -6,7 +6,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="dplython",
-    version="0.0.1",
+    version="0.0.2",
     description="Dplyr-style operations on top of pandas DataFrame.",
     url="https://github.com/dodger487/dplython",
     packages=find_packages(),
