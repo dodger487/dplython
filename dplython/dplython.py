@@ -8,6 +8,9 @@ import operator
 import sys
 import types
 
+import six
+from six.moves import range
+
 import numpy as np
 import pandas
 from pandas import DataFrame
@@ -207,7 +210,7 @@ def CreateLaterFunction(fcn, *args, **kwargs):
     args = [a.applyFcns(self.origDf) if type(a) == Later else a 
         for a in self.args]
     kwargs = {k: v.applyFcns(self.origDf) if type(v) == Later else v 
-        for k, v in self.kwargs.iteritems()}
+        for k, v in six.iteritems(self.kwargs)}
     return self.fcn(*args, **kwargs)
   laterFcn.todo = [lambda df: apply_function(laterFcn, df)]
   return laterFcn
@@ -261,7 +264,7 @@ class DplyFrame(DataFrame):
     return DplyFrame
 
   def CreateGroupIndices(self, names, values):
-    final_filter = pandas.Series([True for t in xrange(len(self))])
+    final_filter = pandas.Series([True for t in range(len(self))])
     final_filter.index = self.index
     for (name, val) in zip(names, values):
       final_filter = final_filter & (self[name] == val)
@@ -276,14 +279,14 @@ class DplyFrame(DataFrame):
   def apply_on_groups(self, delayedFcn, otherDf):
     self.group_self(self._grouped_on)  # TODO: think about removing
     groups = []
-    for group_vals, group_inds in self._group_dict.iteritems():
+    for group_vals, group_inds in six.iteritems(self._group_dict):
       subsetDf = otherDf[group_inds]
       if len(subsetDf) > 0:
         subsetDf._current_group = dict(zip(self._grouped_on, group_vals))
         groups.append(delayedFcn(subsetDf))
 
     outDf = DplyFrame(pandas.concat(groups))
-    outDf.index = range(len(outDf))
+    outDf.index = list(range(len(outDf)))
     return outDf
 
   def __rshift__(self, delayedFcn):
@@ -320,7 +323,7 @@ def dfilter(*args):
   """
   def f(df):
     # TODO: This function is a candidate for improvement!
-    final_filter = pandas.Series([True for t in xrange(len(df))])
+    final_filter = pandas.Series([True for t in range(len(df))])
     final_filter.index = df.index
     for arg in args:
       stmt = arg.applyFcns(df)
@@ -371,7 +374,7 @@ def mutate(**kwargs):
   29  18018.000000          5       Fair
   """
   def addColumns(df):
-    for key, val in kwargs.iteritems():
+    for key, val in six.iteritems(kwargs):
       if type(val) == Later:
         df[key] = val.applyFcns(df)
       else:
@@ -389,7 +392,7 @@ def group_by(*args):
 
 def summarize(**kwargs):
   def CreateSummarizedDf(df):
-    input_dict = {k: val.applyFcns(df) for k, val in kwargs.iteritems()}
+    input_dict = {k: val.applyFcns(df) for k, val in six.iteritems(kwargs)}
     if len(input_dict) == 0:
       return DplyFrame({}, index=index)
     if hasattr(df, "_current_group") and df._current_group:
