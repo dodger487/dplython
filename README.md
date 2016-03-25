@@ -1,5 +1,7 @@
 # Dplython: Dplyr for Python
 
+[![Build Status](https://travis-ci.org/dodger487/dplython.svg?branch=master)](https://travis-ci.org/dodger487/dplython)
+
 Welcome to Dplython: Dplyr for Python.
 
 Dplyr is a library for the language R designed to make data analysis fast and easy.
