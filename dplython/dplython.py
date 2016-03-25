@@ -451,7 +451,8 @@ def sample(*args, **kwargs):
   return X._.sample(*args, **kwargs)
 
 
-nrow = X._.__len__
+def nrow():
+  return X._.__len__()
 
 
 @DelayFunction

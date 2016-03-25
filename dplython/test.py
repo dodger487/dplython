@@ -309,5 +309,22 @@ class TestAlternateAttrGrab(unittest.TestCase):
     self.assertTrue(equality.all())
 
 
+class TestNrow(unittest.TestCase):
+  diamonds = load_diamonds()
+
+  def testSimpleNrow(self):
+    diamonds_pd = self.diamonds.copy()
+    self.assertEquals(len(diamonds_pd), self.diamonds >> nrow())
+
+  def testMultipleNrow(self):
+    diamonds_pd = self.diamonds.copy()
+    self.assertEquals(len(diamonds_pd), self.diamonds >> nrow())
+    self.assertEquals(len(diamonds_pd), self.diamonds >> nrow())
+
+    small_d = diamonds_pd[diamonds_pd.carat > 4]
+    self.assertEquals(
+        len(small_d), self.diamonds >> dfilter(X.carat > 4) >> nrow())
+
+
 if __name__ == '__main__':
   unittest.main()
