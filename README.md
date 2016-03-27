@@ -17,7 +17,12 @@ This is version 0.0.2.
 It's experimental and subject to change.
 
 ## Installation
-To install, use this command or clone the repository.
+To install, use pip:
+```
+pip install dplython
+```
+
+To get the latest development version, you can clone this repo or use the command:
 ```
 pip install git+https://github.com/dodger487/dplython.git
 ```
