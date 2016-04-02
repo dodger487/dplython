@@ -363,17 +363,8 @@ def select(*args):
   1     E   0.21
   2     E   0.23
   """
-  data_arg = None
-  if len(args) > 0 and isinstance(args[0], pandas.DataFrame):
-    data_arg = args[0]
-    args = args[1:]
-
   names = [column.name for column in args]
-
-  if data_arg is None:
-    return lambda df: df[[column.name for column in args]]
-  else:
-    return data_arg[[column.name for column in args]]
+  return lambda df: df[[column.name for column in args]]
 
 
 @ApplyToDataframe
