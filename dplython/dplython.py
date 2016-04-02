@@ -302,9 +302,25 @@ class DplyFrame(DataFrame):
       outDf = self.apply_on_groups(delayedFcn, otherDf)
       return outDf
     else:
-      return DplyFrame(delayedFcn(otherDf))
+      return delayedFcn(otherDf)
 
 
+def ApplyToDataframe(fcn):
+  def DplyrFcn(*args, **kwargs):
+    data_arg = None
+    if len(args) > 0 and isinstance(args[0], pandas.DataFrame):
+      # data_arg = args[0].copy(deep=True)
+      data_arg = args[0]
+      args = args[1:]
+    fcn_to_apply = fcn(*args, **kwargs)
+    if data_arg is None:
+      return fcn_to_apply
+    else:
+      return data_arg >> fcn_to_apply
+  return DplyrFcn
+
+
+@ApplyToDataframe
 def dfilter(*args):
   """Filters rows of the data that meet input criteria.
 
@@ -334,7 +350,7 @@ def dfilter(*args):
   return f
 
 
-# @DelayFunction
+@ApplyToDataframe
 def select(*args):
   """Select specific columns from DataFrame. 
 
@@ -348,12 +364,10 @@ def select(*args):
   2     E   0.23
   """
   names = [column.name for column in args]
-  return X._[[column.name for column in args]]
-  # def get_names(df): return df[names]
-  # return get_names(names)
-  # return DelayFunction(lambda df: df[names])
+  return lambda df: df[[column.name for column in args]]
 
 
+@ApplyToDataframe
 def mutate(**kwargs):
   """Adds a column to the DataFrame.
 
@@ -383,6 +397,7 @@ def mutate(**kwargs):
   return addColumns
 
 
+@ApplyToDataframe
 def group_by(*args):
   def GroupDF(df):
     df.group_self([arg.name for arg in args])
@@ -390,6 +405,7 @@ def group_by(*args):
   return GroupDF
 
 
+@ApplyToDataframe
 def summarize(**kwargs):
   def CreateSummarizedDf(df):
     input_dict = {k: val.applyFcns(df) for k, val in six.iteritems(kwargs)}
@@ -408,10 +424,12 @@ def UngroupDF(df):
   return df
 
 
+@ApplyToDataframe
 def ungroup():
   return UngroupDF
   
 
+@ApplyToDataframe
 def arrange(*args):
   """Sort DataFrame by the input column arguments.
 
@@ -429,30 +447,33 @@ def arrange(*args):
   return lambda df: DplyFrame(df.sort(names))
 
 
+@ApplyToDataframe
 def head(*args, **kwargs):
   """Returns first n rows"""
-  return X._.head(*args, **kwargs)
+  return lambda df: df.head(*args, **kwargs)
 
 
+@ApplyToDataframe
 def sample_n(n):
   """Randomly sample n rows from the DataFrame"""
-  # return X._.sample(n=n)
   return lambda df: DplyFrame(df.sample(n))
 
 
+@ApplyToDataframe
 def sample_frac(frac):
   """Randomly sample `frac` fraction of the DataFrame"""
-  # return X._.sample(frac=frac)
   return lambda df: DplyFrame(df.sample(frac=frac))
 
 
+@ApplyToDataframe
 def sample(*args, **kwargs):
   """Convenience method that calls into pandas DataFrame's sample method"""
-  return X._.sample(*args, **kwargs)
+  return lambda df: df.sample(*args, **kwargs)
 
 
+@ApplyToDataframe
 def nrow():
-  return X._.__len__()
+  return lambda df: len(df)
 
 
 @DelayFunction

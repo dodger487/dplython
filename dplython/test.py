@@ -325,6 +325,108 @@ class TestNrow(unittest.TestCase):
     self.assertEquals(
         len(small_d), self.diamonds >> dfilter(X.carat > 4) >> nrow())
 
+class TestFunctionForm(unittest.TestCase):
+  diamonds = load_diamonds()
+
+  def testDfilter(self):
+    normal = self.diamonds >> dfilter(X.carat > 4)
+    function = dfilter(self.diamonds, X.carat > 4)
+    self.assertTrue(normal.equals(function))
+
+    normal = self.diamonds >> dfilter()
+    function = dfilter(self.diamonds)
+    self.assertTrue(normal.equals(function))
+
+    normal = self.diamonds >> dfilter(X.carat < 4, X.color == "D")
+    function = dfilter(self.diamonds, X.carat < 4, X.color == "D")
+    self.assertTrue(normal.equals(function))
+
+    normal = self.diamonds >> dfilter((X.carat < 4) | (X.color == "D"), 
+                                      X.carat >= 4)
+    function = dfilter(self.diamonds, (X.carat < 4) | (X.color == "D"), 
+                                      X.carat >= 4)
+    self.assertTrue(normal.equals(function))
+
+  def testSelect(self):
+    normal = self.diamonds >> select(X.carat)
+    function = select(self.diamonds, X.carat)
+    self.assertTrue(normal.equals(function))
+
+    normal = self.diamonds >> select(X.cut, X.carat, X.carat)
+    function = select(self.diamonds, X.cut, X.carat, X.carat)
+    self.assertTrue(normal.equals(function))
+
+  def testMutate(self):
+    normal = self.diamonds >> mutate(foo=X.carat)
+    function = mutate(self.diamonds, foo=X.carat)
+    self.assertTrue(normal.equals(function))
+
+    normal = self.diamonds >> mutate(a=X.cut, b=X.x/2, c=32)
+    function = mutate(self.diamonds, a=X.cut, b=X.x/2, c=32)
+    self.assertTrue(normal.equals(function))
+
+  def testGroupBy(self):
+    normal = (self.diamonds >> 
+                    dfilter(X.carat > 3.5) >>
+                    group_by(X.color) >> 
+                    mutate(caratMean=X.carat.mean()))
+    function = self.diamonds >> dfilter(X.carat > 3.5)
+    function = group_by(function, X.color)
+    function = function >> mutate(caratMean=X.carat.mean())
+    self.assertTrue(normal.equals(function))
+
+  def testGroupBy2(self):
+    normal = (self.diamonds >> 
+                    group_by(X.color, X.cut) >> 
+                    mutate(caratMean=X.carat.mean()))
+    function = group_by(self.diamonds, X.color, X.cut)
+    function = function >> mutate(caratMean=X.carat.mean())
+    self.assertTrue(normal.equals(function))
+
+  def testUngroup(self):
+    normal = (self.diamonds >> 
+                    dfilter(X.carat > 3.5) >>
+                    group_by(X.color) >> 
+                    ungroup())
+    function = (self.diamonds >> 
+                    dfilter(X.carat > 3.5) >>
+                    group_by(X.color))
+    function = ungroup(function)
+    self.assertTrue(normal.equals(function))
+
+  def testArrange(self):
+    normal = self.diamonds >> arrange(X.color, X.carat)
+    function = arrange(self.diamonds, X.color, X.carat)
+    self.assertTrue(normal.equals(function))
+
+    normal = self.diamonds >> arrange(X.cut, X.carat, X.y)
+    function = arrange(self.diamonds, X.cut, X.carat, X.y)
+    self.assertTrue(normal.equals(function))
+
+  def testSummarize(self):
+    normal = (self.diamonds >> summarize(sumX=X.x.sum()))
+    function = summarize(self.diamonds, sumX=X.x.sum())
+    self.assertTrue(normal.equals(function))
+
+  def testSummarizeGroupedX(self):
+    normal = self.diamonds >> group_by(X.cut) >> summarize(sumX=X.x.sum())
+    function = self.diamonds >> group_by(X.cut)
+    function = summarize(function, sumX=X.x.sum())
+    self.assertTrue(normal.equals(function))
+
+  def testUtilities(self):
+    normal = self.diamonds >> head()
+    function = head(self.diamonds)
+    self.assertTrue(normal.equals(function))
+
+    normal = self.diamonds >> sample_n(10)
+    function = sample_n(self.diamonds, 10)
+    self.assertEquals(len(normal), len(function))
+    
+    normal = self.diamonds >> sample_frac(0.1)
+    function = sample_frac(self.diamonds, 0.1)
+    self.assertEquals(len(normal), len(function))
+    
 
 if __name__ == '__main__':
   unittest.main()
