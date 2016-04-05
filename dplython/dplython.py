@@ -438,7 +438,7 @@ def arrange(*args):
   """
   # TODO: add in descending and ascending
   names = [column.name for column in args]
-  return lambda df: DplyFrame(df.sort(names))
+  return lambda df: DplyFrame(df.sort_values(names))
 
 
 @ApplyToDataframe
