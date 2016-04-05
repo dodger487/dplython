@@ -219,12 +219,12 @@ class TestArrange(unittest.TestCase):
     self.diamonds >> arrange(X.color, X.cut) >> select(X.color)
 
   def testArrangeSorts(self):
-    sortedColor_pd = self.diamonds.copy().sort("color")["color"]
+    sortedColor_pd = self.diamonds.copy().sort_values("color")["color"]
     sortedColor_dp = (self.diamonds >> arrange(X.color))["color"]
     self.assertTrue(sortedColor_pd.equals(sortedColor_dp))
 
   def testMultiArrangeSorts(self):
-    sortedCarat_pd = self.diamonds.copy().sort(["color", "carat"])["carat"]
+    sortedCarat_pd = self.diamonds.copy().sort_values(["color", "carat"])["carat"]
     sortedCarat_dp = (self.diamonds >> arrange(X.color, X.carat))["carat"]
     self.assertTrue(sortedCarat_pd.equals(sortedCarat_dp))
 
