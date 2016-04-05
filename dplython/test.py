@@ -205,6 +205,13 @@ class TestGroupBy(unittest.TestCase):
                       summarize(total=X.price.sum()) >> X.total[0])
     self.assertEquals(sum_price, sum_price_dp)
 
+  def testDfRemainsGroupedAfterOperation(self):
+    diamonds_dp = (self.diamonds >>
+                    group_by(X.color) >>
+                    mutate(caratMean1=X.carat.mean()) >>
+                    mutate(caratMean2=X.carat.mean()))
+    self.assertTrue(diamonds_dp["caratMean1"].equals(diamonds_dp["caratMean2"]))
+
 
 class TestArrange(unittest.TestCase):
   diamonds = load_diamonds()

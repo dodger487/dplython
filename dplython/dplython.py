@@ -271,30 +271,30 @@ class DplyFrame(DataFrame):
     self._grouped_on = None
     self._grouped_self = None
 
-  def apply_on_groups(self, delayedFcn, otherDf):
-    groups = []
-    for group_name, subsetDf in self._grouped_self:
-      if len(subsetDf) > 0:
-        subsetDf._current_group = dict(zip(self._grouped_on, tuple(group_name)))
-        groups.append(delayedFcn(subsetDf))
-
-    outDf = DplyFrame(pandas.concat(groups))
-    outDf.index = list(range(len(outDf)))
+  def apply_on_groups(self, delayedFcn):
+    outDf = self._grouped_self.apply(delayedFcn)
+    for grouped_name in outDf.index.names[:-1]:
+      if grouped_name in outDf:
+        outDf.reset_index(level=0, drop=True, inplace=True)
+      else:
+        outDf.reset_index(level=0, inplace=True)
+    outDf.group_self(self._grouped_on)
     return outDf
 
   def __rshift__(self, delayedFcn):
-    otherDf = DplyFrame(self.copy(deep=True))
 
     if type(delayedFcn) == Later:
       return delayedFcn.applyFcns(self)
 
     if delayedFcn == UngroupDF:
+      otherDf = DplyFrame(self.copy(deep=True))
       return delayedFcn(otherDf)
 
     if self._grouped_self:
-      outDf = self.apply_on_groups(delayedFcn, otherDf)
+      outDf = self.apply_on_groups(delayedFcn)
       return outDf
     else:
+      otherDf = DplyFrame(self.copy(deep=True))
       return delayedFcn(otherDf)
 
 
