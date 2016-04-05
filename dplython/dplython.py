@@ -16,7 +16,7 @@ import pandas
 from pandas import DataFrame
 
 
-__version__ = "0.0.2"
+__version__ = "0.0.3"
 
 
 # TODOs:
@@ -245,13 +245,13 @@ class DplyFrame(DataFrame):
   * The "ungroup" function call
   * A function that returns a pandas DataFrame or DplyFrame.
   """
-  _metadata = ["_grouped_on", "_group_dict"]
+  _metadata = ["_grouped_on", "_grouped_self"]
 
   def __init__(self, *args, **kwargs):
     super(DplyFrame, self).__init__(*args, **kwargs)
     self._grouped_on = None
-    self._group_dict = None
     self._current_group = None
+    self._grouped_self = None
     if len(args) == 1 and isinstance(args[0], DplyFrame):
       self._copy_attrs(args[0])
 
@@ -263,45 +263,38 @@ class DplyFrame(DataFrame):
   def _constructor(self):
     return DplyFrame
 
-  def CreateGroupIndices(self, names, values):
-    final_filter = pandas.Series([True for t in range(len(self))])
-    final_filter.index = self.index
-    for (name, val) in zip(names, values):
-      final_filter = final_filter & (self[name] == val)
-    return final_filter
-
   def group_self(self, names):
     self._grouped_on = names
-    values = [set(self[name]) for name in names]  # use dplyr here?
-    self._group_dict = {v: self.CreateGroupIndices(names, v) for v in 
-        itertools.product(*values)}
+    self._grouped_self = self.groupby(names)
 
-  def apply_on_groups(self, delayedFcn, otherDf):
-    self.group_self(self._grouped_on)  # TODO: think about removing
-    groups = []
-    for group_vals, group_inds in six.iteritems(self._group_dict):
-      subsetDf = otherDf[group_inds]
-      if len(subsetDf) > 0:
-        subsetDf._current_group = dict(zip(self._grouped_on, group_vals))
-        groups.append(delayedFcn(subsetDf))
+  def ungroup(self):
+    self._grouped_on = None
+    self._grouped_self = None
 
-    outDf = DplyFrame(pandas.concat(groups))
-    outDf.index = list(range(len(outDf)))
+  def apply_on_groups(self, delayedFcn):
+    outDf = self._grouped_self.apply(delayedFcn)
+    for grouped_name in outDf.index.names[:-1]:
+      if grouped_name in outDf:
+        outDf.reset_index(level=0, drop=True, inplace=True)
+      else:
+        outDf.reset_index(level=0, inplace=True)
+    outDf.group_self(self._grouped_on)
     return outDf
 
   def __rshift__(self, delayedFcn):
-    otherDf = DplyFrame(self.copy(deep=True))
 
     if type(delayedFcn) == Later:
       return delayedFcn.applyFcns(self)
 
     if delayedFcn == UngroupDF:
+      otherDf = DplyFrame(self.copy(deep=True))
       return delayedFcn(otherDf)
 
-    if self._group_dict:
-      outDf = self.apply_on_groups(delayedFcn, otherDf)
+    if self._grouped_self:
+      outDf = self.apply_on_groups(delayedFcn)
       return outDf
     else:
+      otherDf = DplyFrame(self.copy(deep=True))
       return delayedFcn(otherDf)
 
 
@@ -419,8 +412,9 @@ def summarize(**kwargs):
 
 
 def UngroupDF(df):
-  df._grouped_on = None
-  df._group_dict = None
+  # df._grouped_on = None
+  # df._group_dict = None
+  df.ungroup()
   return df
 
 
