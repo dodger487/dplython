@@ -84,6 +84,12 @@ class TestMutates(unittest.TestCase):
   def testReverseThings(self):
     self.diamonds >> mutate(foo=1 - X.carat, bar=7 // X.x, baz=4 % X.y.round())
 
+  def testMethodFirst(self):
+    diamonds_dp = self.diamonds >> mutate(avgDiff=X.x.mean() - X.x)
+    diamonds_pd = self.diamonds.copy()
+    diamonds_pd["avgDiff"] = diamonds_pd["x"].mean() - diamonds_pd["x"]
+    self.assertTrue(diamonds_dp["avgDiff"].equals(diamonds_pd["avgDiff"]))
+
 
 class TestSelects(unittest.TestCase):
   diamonds = load_diamonds()
@@ -331,6 +337,7 @@ class TestNrow(unittest.TestCase):
     small_d = diamonds_pd[diamonds_pd.carat > 4]
     self.assertEquals(
         len(small_d), self.diamonds >> dfilter(X.carat > 4) >> nrow())
+
 
 class TestFunctionForm(unittest.TestCase):
   diamonds = load_diamonds()
