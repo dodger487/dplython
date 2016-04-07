@@ -104,20 +104,16 @@ normal_operators = [
 ]
 
 
-# operator_hooks = [name for name in dir(operator) if name.startswith('__') and 
-#                   name.endswith('__')]
-def create_reversible_func(func_name, rfunc_name):
+def create_reversible_func(func_name):
   def reversible_func(self, arg):
-    def TryReverseIfNoRegular(df):
-      if func_name in dir(df) and type(arg) == Later:
-        return getattr(df, func_name)(arg.applyFcns(self.origDf))
-      elif func_name in dir(df) and type(arg) != Later:
-        return getattr(df, func_name)(arg)
-      elif func_name not in dir(df) and type(arg) == Later:
-        return getattr(arg.applyFcns(self.origDf), rfunc_name)(df)
+    def use_operator(df):
+      if isinstance(arg, Later):
+        altered_arg = arg.applyFcns(self.origDf)
       else:
-        return getattr(arg, rfunc_name)(df)
-    self.todo.append(TryReverseIfNoRegular)
+        altered_arg = arg
+      return getattr(operator, func_name)(df, altered_arg)
+
+    self.todo.append(use_operator)
     return self
   return reversible_func
 
@@ -140,7 +136,7 @@ def instrument_operator_hooks(cls):
     add_hook(hook_name)
 
   for func_name, rfunc_name in reversible_operators:
-    setattr(cls, func_name, create_reversible_func(func_name, rfunc_name))
+    setattr(cls, func_name, create_reversible_func(func_name))
 
   return cls
 
