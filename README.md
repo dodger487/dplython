@@ -29,7 +29,9 @@ pip install git+https://github.com/dodger487/dplython.git
 
 ## Example usage
 ```python
-from dplython import *
+import pandas
+from dplython import (DplyFrame, X, diamonds, select, dfilter, sample_n,
+    sample_frac, head, arrange, mutate, group_by, summarize, DelayFunction) 
 
 # The example `diamonds` DataFrame is included in this package, but you can 
 # cast a DataFrame to a DplyFrame in this simple way:
@@ -140,9 +142,8 @@ diamonds >> PairwiseGreater(X.x, X.y)
 
 
 # Passing entire dataframe and plotting with ggplot
-from ggplot import *
+from ggplot import ggplot, aes, geom_point, facet_wrap
 ggplot = DelayFunction(ggplot)  # Simple installation
-diamonds = DplyFrame(pandas.read_csv('./diamonds.csv'))  # Masked in ggplot pkg
 (diamonds >> ggplot(aes(x="carat", y="price", color="cut"), data=X._) + 
   geom_point() + facet_wrap("color"))
 ```
