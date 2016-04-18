@@ -106,6 +106,8 @@ normal_operators = [
 
 def create_reversible_func(func_name):
   def reversible_func(self, arg):
+    self._UpdateStrAttr(func_name)
+    self._UpdateStrCallArgs([arg], {})
     def use_operator(df):
       if isinstance(arg, Later):
         altered_arg = arg.applyFcns(self.origDf)
@@ -120,11 +122,13 @@ def create_reversible_func(func_name):
 
 def instrument_operator_hooks(cls):
   def add_hook(name):
-    def op_hook(self, *args, **kw):
+    def op_hook(self, *args, **kwargs):
+      self._UpdateStrAttr(name)
+      self._UpdateStrCallArgs(args, kwargs)
       if len(args) > 0 and type(args[0]) == Later:
         self.todo.append(lambda df: getattr(df, name)(args[0].applyFcns(self.origDf)))
       else:  
-        self.todo.append(lambda df: getattr(df, name)(*args, **kw))
+        self.todo.append(lambda df: getattr(df, name)(*args, **kwargs))
       return self
 
     try:
@@ -139,6 +143,10 @@ def instrument_operator_hooks(cls):
     setattr(cls, func_name, create_reversible_func(func_name))
 
   return cls
+
+
+def _addQuotes(item):
+  return '"' + item + '"' if isinstance(item, str) else item
 
 
 @instrument_operator_hooks
@@ -173,6 +181,7 @@ class Later(object):
       self.todo = [lambda df: df]
     else:
       self.todo = [lambda df: df[self.name]]
+    self._str = 'data["{0}"]'.format(name)
   
   def applyFcns(self, df):
     self.origDf = df
@@ -181,23 +190,42 @@ class Later(object):
       stmt = func(stmt)
     return stmt
     
+  def __str__(self):
+    return "{0}".format(self._str)
+
+  def __repr__(self):
+    return "{0}".format(self._str)
+
   def __getattr__(self, attr):
     self.todo.append(lambda df: getattr(df, attr))
+    self._UpdateStrAttr(attr)
     return self
 
   def __call__(self, *args, **kwargs):
     self.todo.append(lambda foo: foo.__call__(*args, **kwargs))
+    self._UpdateStrCallArgs(args, kwargs)
     return self
 
   def __rrshift__(self, df):
     otherDf = DplyFrame(df.copy(deep=True))
     return self.applyFcns(otherDf)
 
+  def _UpdateStrAttr(self, attr):
+    self._str += ".{0}".format(attr)
+
+  def _UpdateStrCallArgs(self, args, kwargs):
+    # We sort here because keyword arguments get arbitrary ordering inside the 
+    # function call. Support PEP 0468 to help fix this issue!
+    # https://www.python.org/dev/peps/pep-0468/
+    kwargs_strs = sorted(["{0}={1}".format(k, _addQuotes(v)) 
+        for k, v in kwargs.items()])
+    input_strs = list(map(str, args)) + kwargs_strs
+    input_str = ", ".join(input_strs)
+    self._str += "({0})".format(input_str)
 
 
 def CreateLaterFunction(fcn, *args, **kwargs):
-  laterFcn = Later("_FUNCTION")
-  # laterFcn = Later(fcn.func_name + "_FUNCTION")
+  laterFcn = Later(fcn.__name__)
   laterFcn.fcn = fcn
   laterFcn.args = args
   laterFcn.kwargs = kwargs
@@ -209,6 +237,8 @@ def CreateLaterFunction(fcn, *args, **kwargs):
         for k, v in six.iteritems(self.kwargs)}
     return self.fcn(*args, **kwargs)
   laterFcn.todo = [lambda df: apply_function(laterFcn, df)]
+  laterFcn._str = '{0}'.format(fcn.__name__)
+  laterFcn._UpdateStrCallArgs(args, kwargs)
   return laterFcn
   
 
@@ -216,8 +246,8 @@ def DelayFunction(fcn):
   def DelayedFcnCall(*args, **kwargs):
     # Check to see if any args or kw are Later. If not, return normal fcn.
     checkIfLater = lambda x: type(x) == Later
-    if (len(filter(checkIfLater, args)) == 0 and 
-        len(filter(checkIfLater, kwargs.values())) == 0):
+    if (len([a for a in args if isinstance(a, Later)]) == 0 and
+        len([v for k, v in kwargs.items() if isinstance(a, Later)]) == 0):
       return fcn(*args, **kwargs)
     else:
       return CreateLaterFunction(fcn, *args, **kwargs)

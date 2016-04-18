@@ -18,6 +18,59 @@ def load_diamonds():
     return DplyFrame(pd.read_csv(path))
 
 
+class TestLaterStrMethod(unittest.TestCase):
+  
+  def test_column_name(self):
+    foo = X.foo
+    self.assertEqual(foo._str, 'data["foo"]')
+
+  def test_str(self):
+    foo = X.foo
+    self.assertEqual(str(foo), 'data["foo"]')
+
+  def test_later_with_method(self):
+    foo = X.foo.mean
+    self.assertEqual(str(foo), 'data["foo"].mean')
+
+  def test_later_with_method_call(self):
+    foo = X.foo.mean()
+    self.assertEqual(str(foo), 'data["foo"].mean()')
+    foo = X.foo.mean(1)
+    self.assertEqual(str(foo), 'data["foo"].mean(1)')
+    foo = X.foo.mean(1, 2)
+    self.assertEqual(str(foo), 'data["foo"].mean(1, 2)')
+    foo = X.foo.mean(numeric_only=True)
+    self.assertEqual(str(foo), 'data["foo"].mean(numeric_only=True)')
+    # The order is different here, because the original order of the kwargs is
+    # lost when kwargs are passed to the function. To insure consistent results,
+    #  the kwargs are sorted alphabetically by key. To help deal with this
+    # issue, support PEP 0468: https://www.python.org/dev/peps/pep-0468/
+    foo = X.foo.mean(numeric_only=True, level="bar")
+    self.assertEqual(str(foo), 'data["foo"].mean(level="bar", '
+                               'numeric_only=True)')
+    foo = X.foo.mean(1, numeric_only=True, level="bar")
+    self.assertEqual(str(foo), 'data["foo"].mean(1, level="bar", '
+                               'numeric_only=True)')
+    foo = X.foo.mean(1, 2, numeric_only=True, level="bar")
+    self.assertEqual(str(foo), 'data["foo"].mean(1, 2, level="bar", '
+                               'numeric_only=True)')
+    foo = X.foo.mean(X.y.mean())
+    self.assertEqual(str(foo), 'data["foo"].mean('
+                               'data["y"].mean())')
+
+  def test_later_with_delayed_function(self):
+    mylen = DelayFunction(len)
+    foo = mylen(X.foo)
+    self.assertEqual(str(foo), 'len(data["foo"])')
+
+  def test_more_later_ops_str(self):
+    mylen = DelayFunction(len)
+    foo = mylen(X.foo) + X.y.mean() // X.y.median(X.z)
+    self.assertEqual(str(foo), 'len(data["foo"]).__add__('
+                               'data["y"].mean().__floordiv__('
+                               'data["y"].median(data["z"])))')
+
+
 class TestMutates(unittest.TestCase):
   diamonds = load_diamonds()
 
@@ -178,7 +231,7 @@ class TestGroupBy(unittest.TestCase):
                     group_by(X.color) >> 
                     mutate(caratMean=X.carat.mean()))
     carats_dp = set(diamonds_dp["caratMean"].values)
-    self.assertEquals(carats_pd, carats_dp)
+    self.assertEqual(carats_pd, carats_dp)
 
   def testTwoGroupby(self):
     diamonds_pd = self.diamonds.copy()
@@ -188,7 +241,7 @@ class TestGroupBy(unittest.TestCase):
                     group_by(X.color, X.cut) >> 
                     mutate(caratMean=X.carat.mean()))
     carats_dp = set(diamonds_dp["caratMean"].values)
-    self.assertEquals(carats_pd, carats_dp)
+    self.assertEqual(carats_pd, carats_dp)
 
   def testGroupThenFilterDoesntDie(self):
     diamonds_dp = (self.diamonds >> 
@@ -205,11 +258,11 @@ class TestGroupBy(unittest.TestCase):
   def testGroupUngroupSummarize(self):
     num_rows = (self.diamonds >> group_by(X.cut) >> ungroup() >> 
                       summarize(total=X.price.sum()) >> nrow())
-    self.assertEquals(num_rows, 1)
+    self.assertEqual(num_rows, 1)
     sum_price = self.diamonds.sum()["price"]
     sum_price_dp = (self.diamonds >> group_by(X.cut) >> ungroup() >> 
                       summarize(total=X.price.sum()) >> X.total[0])
-    self.assertEquals(sum_price, sum_price_dp)
+    self.assertEqual(sum_price, sum_price_dp)
 
   def testDfRemainsGroupedAfterOperation(self):
     diamonds_dp = (self.diamonds >>
@@ -251,35 +304,35 @@ class TestSample(unittest.TestCase):
 
   def testSamplesGetsRightNumber(self):
     shouldBe5 = self.diamonds >> sample_n(5) >> X._.__len__()
-    self.assertEquals(shouldBe5, 5)
+    self.assertEqual(shouldBe5, 5)
     frac = len(self.diamonds) * 0.1
     shouldBeFrac = self.diamonds >> sample_frac(0.1) >> X._.__len__()
-    self.assertEquals(shouldBeFrac, frac)
+    self.assertEqual(shouldBeFrac, frac)
 
   def testSampleEqualsPandasSample(self):
     for i in [1, 10, 100, 1000]:
       shouldBeI = self.diamonds >> sample_n(i) >> X._.__len__()
-      self.assertEquals(shouldBeI, i)
+      self.assertEqual(shouldBeI, i)
     for i in [.1, .01, .001]:
       shouldBeI = self.diamonds >> sample_frac(i) >> X._.__len__()
-      self.assertEquals(shouldBeI, round(len(self.diamonds)*i))
+      self.assertEqual(shouldBeI, round(len(self.diamonds)*i))
 
   def testSample0(self):
     shouldBe0 = self.diamonds >> sample_n(0) >> X._.__len__()
-    self.assertEquals(shouldBe0, 0)
+    self.assertEqual(shouldBe0, 0)
     shouldBeFrac = self.diamonds >> sample_frac(0) >> X._.__len__()
-    self.assertEquals(shouldBeFrac, 0.)
+    self.assertEqual(shouldBeFrac, 0.)
 
   def testGroupedSample(self):
     num_groups = len(set(self.diamonds["cut"]))
     for i in [0, 1, 10, 100, 1000]:
       numRows = self.diamonds >> group_by(X.cut) >> sample_n(i) >> X._.__len__()
-      self.assertEquals(numRows, i*num_groups)
+      self.assertEqual(numRows, i*num_groups)
     for i in [.1, .01, .001]:
       shouldBeI = self.diamonds >> group_by(X.cut) >> sample_frac(i) >> X._.__len__()
       out = sum([len(self.diamonds[self.diamonds.cut == c].sample(frac=i)) for c in set(self.diamonds.cut)])
-      # self.assertEquals(shouldBeI, math.floor(len(self.diamonds)*i))
-      self.assertEquals(shouldBeI, out)
+      # self.assertEqual(shouldBeI, math.floor(len(self.diamonds)*i))
+      self.assertEqual(shouldBeI, out)
 
 
 class TestSummarize(unittest.TestCase):
@@ -292,7 +345,7 @@ class TestSummarize(unittest.TestCase):
     diamonds_pd = self.diamonds.copy()
     sumX_pd = diamonds_pd.sum()["x"]
     sumX_dp = (self.diamonds >> summarize(sumX=X.x.sum()))["sumX"][0]
-    self.assertEquals(round(sumX_pd), round(sumX_dp))
+    self.assertEqual(round(sumX_pd), round(sumX_dp))
 
   def testSummarizeGroupedX(self):
     diamonds_pd = self.diamonds.copy()
@@ -303,7 +356,7 @@ class TestSummarize(unittest.TestCase):
                 summarize(sumX=X.x.sum()) >> X._["sumX"]).values.copy()
     valX_dp.sort()
     for i, j in zip(val_pd, valX_dp):
-      self.assertEquals(round(i), round(j))
+      self.assertEqual(round(i), round(j))
 
 
 class TestAlternateAttrGrab(unittest.TestCase):
@@ -327,15 +380,15 @@ class TestNrow(unittest.TestCase):
 
   def testSimpleNrow(self):
     diamonds_pd = self.diamonds.copy()
-    self.assertEquals(len(diamonds_pd), self.diamonds >> nrow())
+    self.assertEqual(len(diamonds_pd), self.diamonds >> nrow())
 
   def testMultipleNrow(self):
     diamonds_pd = self.diamonds.copy()
-    self.assertEquals(len(diamonds_pd), self.diamonds >> nrow())
-    self.assertEquals(len(diamonds_pd), self.diamonds >> nrow())
+    self.assertEqual(len(diamonds_pd), self.diamonds >> nrow())
+    self.assertEqual(len(diamonds_pd), self.diamonds >> nrow())
 
     small_d = diamonds_pd[diamonds_pd.carat > 4]
-    self.assertEquals(
+    self.assertEqual(
         len(small_d), self.diamonds >> dfilter(X.carat > 4) >> nrow())
 
 
@@ -435,11 +488,11 @@ class TestFunctionForm(unittest.TestCase):
 
     normal = self.diamonds >> sample_n(10)
     function = sample_n(self.diamonds, 10)
-    self.assertEquals(len(normal), len(function))
+    self.assertEqual(len(normal), len(function))
     
     normal = self.diamonds >> sample_frac(0.1)
     function = sample_frac(self.diamonds, 0.1)
-    self.assertEquals(len(normal), len(function))
+    self.assertEqual(len(normal), len(function))
     
 
 if __name__ == '__main__':
