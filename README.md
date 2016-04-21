@@ -30,7 +30,7 @@ pip install git+https://github.com/dodger487/dplython.git
 ## Example usage
 ```python
 import pandas
-from dplython import (DplyFrame, X, diamonds, select, dfilter, sample_n,
+from dplython import (DplyFrame, X, diamonds, select, sift, sample_n,
     sample_frac, head, arrange, mutate, group_by, summarize, DelayFunction) 
 
 # The example `diamonds` DataFrame is included in this package, but you can 
@@ -50,8 +50,8 @@ Out:
 4   0.31       Good    335
 """
 
-# Filter out rows using dfilter
-diamonds >> dfilter(X.carat > 4) >> select(X.carat, X.cut, X.depth, X.price)
+# Filter out rows using sift
+diamonds >> sift(X.carat > 4) >> select(X.carat, X.cut, X.depth, X.price)
 """
 Out:
        carat      cut  depth  price
@@ -151,7 +151,7 @@ ggplot = DelayFunction(ggplot)  # Simple installation
 
 ```python
 (diamonds >>
-  dfilter((X.clarity == "I1") | (X.clarity == "IF")) >> 
+  sift((X.clarity == "I1") | (X.clarity == "IF")) >> 
   ggplot(aes(x="carat", y="price", color="color"), X._) + 
     geom_point() + 
     facet_wrap("clarity"))

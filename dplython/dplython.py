@@ -16,7 +16,7 @@ import pandas
 from pandas import DataFrame
 
 
-__version__ = "0.0.3a"
+__version__ = "0.0.4"
 
 
 # TODOs:
@@ -159,7 +159,7 @@ class Later(object):
 
   Thus, we can refer to columns of the DataFrame as inputs to functions without 
   having the DataFrame currently available:
-  In : diamonds >> dfilter(X.carat > 4) >> select(X.carat, X.price)
+  In : diamonds >> sift(X.carat > 4) >> select(X.carat, X.price)
   Out:
          carat  price
   25998   4.01  15223
@@ -340,18 +340,18 @@ def ApplyToDataframe(fcn):
 
 
 @ApplyToDataframe
-def dfilter(*args):
+def sift(*args):
   """Filters rows of the data that meet input criteria.
 
-  Giving multiple arguments to dfilter is equivalent to a logical "and".
-  In: df >> dfilter(X.carat > 4, X.cut == "Premium")
+  Giving multiple arguments to sift is equivalent to a logical "and".
+  In: df >> sift(X.carat > 4, X.cut == "Premium")
   # Out:
   # carat      cut color clarity  depth  table  price      x  ...
   #  4.01  Premium     I      I1   61.0     61  15223  10.14
   #  4.01  Premium     J      I1   62.5     62  15223  10.02
   
   As in pandas, use bitwise logical operators like |, &:
-  In: df >> dfilter((X.carat > 4) | (X.cut == "Ideal")) >> head(2)
+  In: df >> sift((X.carat > 4) | (X.cut == "Ideal")) >> head(2)
   # Out:  carat    cut color clarity  depth ...
   #        0.23  Ideal     E     SI2   61.5     
   #        0.23  Ideal     J     VS1   62.8     
