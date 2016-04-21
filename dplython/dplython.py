@@ -7,6 +7,8 @@ import itertools
 import operator
 import sys
 import types
+import warnings
+warnings.simplefilter("once")
 
 import six
 from six.moves import range
@@ -367,6 +369,12 @@ def sift(*args):
       raise Exception("Inputs to filter must be boolean")
     return df[final_filter]
   return f
+
+
+def dfilter(*args, **kwargs):
+  warnings.warn("'dfilter' is deprecated. Please use 'sift' instead.",
+                DeprecationWarning)
+  return sift(*args, **kwargs)
 
 
 @ApplyToDataframe
