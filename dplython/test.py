@@ -172,39 +172,39 @@ class TestFilters(unittest.TestCase):
   def testFilterEasy(self):
     diamonds_pd = self.diamonds.copy()
     diamonds_pd = diamonds_pd[diamonds_pd.cut == "Ideal"]
-    diamonds_dp = self.diamonds >> dfilter(X.cut == "Ideal")
+    diamonds_dp = self.diamonds >> sift(X.cut == "Ideal")
     self.assertTrue(diamonds_pd.equals(diamonds_dp))
 
   def testFilterNone(self):
     diamonds_pd = self.diamonds.copy()
-    diamonds_dp = self.diamonds >> dfilter()
+    diamonds_dp = self.diamonds >> sift()
     self.assertTrue(diamonds_pd.equals(diamonds_dp))    
 
   def testFilterWithMultipleArgs(self):
     diamonds_pd = self.diamonds.copy()
     diamonds_pd = diamonds_pd[(diamonds_pd.cut == "Ideal") & 
                               (diamonds_pd.carat > 3)]
-    diamonds_dp = self.diamonds >> dfilter(X.cut == "Ideal", X.carat > 3)
+    diamonds_dp = self.diamonds >> sift(X.cut == "Ideal", X.carat > 3)
     self.assertTrue(diamonds_pd.equals(diamonds_dp))    
 
   def testFilterWithAnd(self):
     diamonds_pd = self.diamonds.copy()
     diamonds_pd = diamonds_pd[(diamonds_pd.cut == "Ideal") & 
                               (diamonds_pd.carat > 3)]
-    diamonds_dp = self.diamonds >> dfilter((X.cut == "Ideal") & (X.carat > 3))
+    diamonds_dp = self.diamonds >> sift((X.cut == "Ideal") & (X.carat > 3))
     self.assertTrue(diamonds_pd.equals(diamonds_dp))    
 
   def testFilterWithOr(self):
     diamonds_pd = self.diamonds.copy()
     diamonds_pd = diamonds_pd[(diamonds_pd.cut == "Ideal") |
                               (diamonds_pd.carat > 3)]
-    diamonds_dp = self.diamonds >> dfilter((X.cut == "Ideal") | (X.carat > 3))
+    diamonds_dp = self.diamonds >> sift((X.cut == "Ideal") | (X.carat > 3))
     self.assertTrue(diamonds_pd.equals(diamonds_dp))    
 
   def testFilterMultipleLaterColumns(self):
     diamonds_pd = self.diamonds.copy()
     diamonds_pd = diamonds_pd[diamonds_pd.carat > diamonds_pd.x - diamonds_pd.y]
-    diamonds_dp = self.diamonds >> dfilter(X.carat > X.x - X.y)
+    diamonds_dp = self.diamonds >> sift(X.carat > X.x - X.y)
     self.assertTrue(diamonds_pd.equals(diamonds_dp))    
 
 
@@ -227,7 +227,7 @@ class TestGroupBy(unittest.TestCase):
     diamonds_pd = self.diamonds.copy()
     carats_pd = set(diamonds_pd[diamonds_pd.carat > 3.5].groupby('color').mean()["carat"])
     diamonds_dp = (self.diamonds >> 
-                    dfilter(X.carat > 3.5) >>
+                    sift(X.carat > 3.5) >>
                     group_by(X.color) >> 
                     mutate(caratMean=X.carat.mean()))
     carats_dp = set(diamonds_dp["caratMean"].values)
@@ -237,7 +237,7 @@ class TestGroupBy(unittest.TestCase):
     diamonds_pd = self.diamonds.copy()
     carats_pd = set(diamonds_pd[diamonds_pd.carat > 3.5].groupby(["color", "cut"]).mean()["carat"])
     diamonds_dp = (self.diamonds >> 
-                    dfilter(X.carat > 3.5) >>
+                    sift(X.carat > 3.5) >>
                     group_by(X.color, X.cut) >> 
                     mutate(caratMean=X.carat.mean()))
     carats_dp = set(diamonds_dp["caratMean"].values)
@@ -246,13 +246,13 @@ class TestGroupBy(unittest.TestCase):
   def testGroupThenFilterDoesntDie(self):
     diamonds_dp = (self.diamonds >> 
                     group_by(X.color) >> 
-                    dfilter(X.carat > 3.5) >>
+                    sift(X.carat > 3.5) >>
                     mutate(caratMean=X.carat.mean()))
 
   def testGroupThenFilterDoesntDie2(self):
     diamonds_dp = (self.diamonds >> 
                     group_by(X.color) >> 
-                    dfilter(X.carat > 3.5, X.color != "I") >>
+                    sift(X.carat > 3.5, X.color != "I") >>
                     mutate(caratMean=X.carat.mean()))
 
   def testGroupUngroupSummarize(self):
@@ -389,28 +389,28 @@ class TestNrow(unittest.TestCase):
 
     small_d = diamonds_pd[diamonds_pd.carat > 4]
     self.assertEqual(
-        len(small_d), self.diamonds >> dfilter(X.carat > 4) >> nrow())
+        len(small_d), self.diamonds >> sift(X.carat > 4) >> nrow())
 
 
 class TestFunctionForm(unittest.TestCase):
   diamonds = load_diamonds()
 
-  def testDfilter(self):
-    normal = self.diamonds >> dfilter(X.carat > 4)
-    function = dfilter(self.diamonds, X.carat > 4)
+  def testsift(self):
+    normal = self.diamonds >> sift(X.carat > 4)
+    function = sift(self.diamonds, X.carat > 4)
     self.assertTrue(normal.equals(function))
 
-    normal = self.diamonds >> dfilter()
-    function = dfilter(self.diamonds)
+    normal = self.diamonds >> sift()
+    function = sift(self.diamonds)
     self.assertTrue(normal.equals(function))
 
-    normal = self.diamonds >> dfilter(X.carat < 4, X.color == "D")
-    function = dfilter(self.diamonds, X.carat < 4, X.color == "D")
+    normal = self.diamonds >> sift(X.carat < 4, X.color == "D")
+    function = sift(self.diamonds, X.carat < 4, X.color == "D")
     self.assertTrue(normal.equals(function))
 
-    normal = self.diamonds >> dfilter((X.carat < 4) | (X.color == "D"), 
+    normal = self.diamonds >> sift((X.carat < 4) | (X.color == "D"), 
                                       X.carat >= 4)
-    function = dfilter(self.diamonds, (X.carat < 4) | (X.color == "D"), 
+    function = sift(self.diamonds, (X.carat < 4) | (X.color == "D"), 
                                       X.carat >= 4)
     self.assertTrue(normal.equals(function))
 
@@ -434,10 +434,10 @@ class TestFunctionForm(unittest.TestCase):
 
   def testGroupBy(self):
     normal = (self.diamonds >> 
-                    dfilter(X.carat > 3.5) >>
+                    sift(X.carat > 3.5) >>
                     group_by(X.color) >> 
                     mutate(caratMean=X.carat.mean()))
-    function = self.diamonds >> dfilter(X.carat > 3.5)
+    function = self.diamonds >> sift(X.carat > 3.5)
     function = group_by(function, X.color)
     function = function >> mutate(caratMean=X.carat.mean())
     self.assertTrue(normal.equals(function))
@@ -452,11 +452,11 @@ class TestFunctionForm(unittest.TestCase):
 
   def testUngroup(self):
     normal = (self.diamonds >> 
-                    dfilter(X.carat > 3.5) >>
+                    sift(X.carat > 3.5) >>
                     group_by(X.color) >> 
                     ungroup())
     function = (self.diamonds >> 
-                    dfilter(X.carat > 3.5) >>
+                    sift(X.carat > 3.5) >>
                     group_by(X.color))
     function = ungroup(function)
     self.assertTrue(normal.equals(function))
