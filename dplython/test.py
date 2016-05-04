@@ -143,6 +143,12 @@ class TestMutates(unittest.TestCase):
     diamonds_pd["avgDiff"] = diamonds_pd["x"].mean() - diamonds_pd["x"]
     self.assertTrue(diamonds_dp["avgDiff"].equals(diamonds_pd["avgDiff"]))
 
+  def testArgsNotKwargs(self):
+    diamonds_dp = mutate(self.diamonds, X.carat+1)
+    diamonds_pd = self.diamonds.copy()
+    diamonds_pd['data["carat"].__add__(1)'] = diamonds_pd.carat + 1
+    self.assertTrue(diamonds_pd.equals(diamonds_dp))
+
 
 class TestSelects(unittest.TestCase):
   diamonds = load_diamonds()
@@ -293,6 +299,18 @@ class TestArrange(unittest.TestCase):
     sortedCarat_pd = self.diamonds.copy().sort_values(["color", "carat"])["carat"]
     sortedCarat_dp = (self.diamonds >> arrange(X.color, X.carat))["carat"]
     self.assertTrue(sortedCarat_pd.equals(sortedCarat_dp))
+
+  def testArrangeDescending(self):
+    sortedCarat_pd = self.diamonds.copy().sort_values("carat", ascending=False)
+    sortedCarat_dp = self.diamonds >> arrange(-X.carat)
+    self.assertTrue((sortedCarat_pd.carat == sortedCarat_dp.carat).all())
+
+  def testArrangeByComputedLater(self):
+    sortedDf = self.diamonds >> arrange((X.carat-3)**2)
+    self.assertEqual((sortedDf.iloc[0].carat-3)**2,
+                     min((self.diamonds.carat-3)**2))
+    self.assertEqual((sortedDf.iloc[-1].carat-3)**2,
+                     max((self.diamonds.carat-3)**2))
 
 
 class TestSample(unittest.TestCase):
