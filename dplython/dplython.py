@@ -395,7 +395,7 @@ def select(*args):
 
 
 @ApplyToDataframe
-def mutate(**kwargs):
+def mutate(*args, **kwargs):
   """Adds a column to the DataFrame.
 
   This can use existing columns of the DataFrame as input.
@@ -415,6 +415,12 @@ def mutate(**kwargs):
   29  18018.000000          5       Fair
   """
   def addColumns(df):
+    for arg in args:
+      if isinstance(arg, Later):
+        df[str(arg)] = arg.applyFcns(df)
+      else:
+        df[str(arg)] = arg
+        
     for key, val in six.iteritems(kwargs):
       if type(val) == Later:
         df[key] = val.applyFcns(df)
@@ -470,9 +476,12 @@ def arrange(*args):
   3468    61.6   3392
   23829   62.0  11903
   """
-  # TODO: add in descending and ascending
   names = [column.name for column in args]
-  return lambda df: DplyFrame(df.sort_values(names))
+  def f(df):
+    sortby_df = df >> mutate(*args)
+    index = sortby_df.sort_values(map(str, args)).index
+    return df.loc[index]
+  return f
 
 
 @ApplyToDataframe
