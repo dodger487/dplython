@@ -420,7 +420,7 @@ def mutate(*args, **kwargs):
         df[str(arg)] = arg.applyFcns(df)
       else:
         df[str(arg)] = arg
-        
+
     for key, val in six.iteritems(kwargs):
       if type(val) == Later:
         df[key] = val.applyFcns(df)
@@ -479,7 +479,7 @@ def arrange(*args):
   names = [column.name for column in args]
   def f(df):
     sortby_df = df >> mutate(*args)
-    index = sortby_df.sort_values(map(str, args)).index
+    index = sortby_df.sort_values([str(arg) for arg in args]).index
     return df.loc[index]
   return f
 
