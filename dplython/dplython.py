@@ -247,9 +247,8 @@ def CreateLaterFunction(fcn, *args, **kwargs):
 def DelayFunction(fcn):
   def DelayedFcnCall(*args, **kwargs):
     # Check to see if any args or kw are Later. If not, return normal fcn.
-    checkIfLater = lambda x: type(x) == Later
     if (len([a for a in args if isinstance(a, Later)]) == 0 and
-        len([v for k, v in kwargs.items() if isinstance(a, Later)]) == 0):
+        len([v for k, v in kwargs.items() if isinstance(v, Later)]) == 0):
       return fcn(*args, **kwargs)
     else:
       return CreateLaterFunction(fcn, *args, **kwargs)
