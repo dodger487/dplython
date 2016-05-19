@@ -177,7 +177,7 @@ class Later(object):
   carat     1.16     1.52     0.9    0.3     0.74    0.31
   price  7803.00  8299.00  4593.0  540.0  3315.00  816.00
   """
-  OPERATORS = {
+  BINARY_OPERATORS = {
     "__add__": "+",
     "__minus__": "-",
     "__mul__": "*",
@@ -192,6 +192,12 @@ class Later(object):
     "__or__": "|"
   }
 
+  UNARY_OPERATORS = {
+    "__neg__": "-",
+    "__pos__": "+",
+    "__invert__": "~"
+  }
+
   def __init__(self, name):
     self.name = name
     if name == "_":
@@ -199,6 +205,8 @@ class Later(object):
     else:
       self.todo = [lambda df: df[self.name]]
     self._str = 'X["{0}"]'.format(name)
+    self.operating = False
+    self.compound = False
   
   def applyFcns(self, df):
     self.origDf = df
@@ -228,8 +236,15 @@ class Later(object):
     return self.applyFcns(otherDf)
 
   def _UpdateStrAttr(self, attr):
-    if attr in self.OPERATORS:
-        self._str += " {0} ".format(self.OPERATORS[attr])
+    if self.compound:
+        self._str = "(" + self._str + ")"
+        self.compound = False
+    if attr in self.BINARY_OPERATORS:
+        self._str += " {0} ".format(self.BINARY_OPERATORS[attr])
+        self.operating = True
+    elif attr in self.UNARY_OPERATORS:
+        self._str = self.UNARY_OPERATORS[attr] + self._str
+        self.operating = True
     else:
         self._str += ".{0}".format(attr)
 
@@ -237,11 +252,22 @@ class Later(object):
     # We sort here because keyword arguments get arbitrary ordering inside the 
     # function call. Support PEP 0468 to help fix this issue!
     # https://www.python.org/dev/peps/pep-0468/
-    kwargs_strs = sorted(["{0}={1}".format(k, _addQuotes(v)) 
-        for k, v in kwargs.items()])
-    input_strs = list(map(str, args)) + kwargs_strs
-    input_str = ", ".join(input_strs)
-    self._str += "({0})".format(input_str)
+    if self.operating:
+        if len(args):
+            # binary operator
+            arg = args[0]
+            if type(arg) is Later and arg.compound:
+                self._str += "(" + str(arg) + ")"
+            else:
+                self._str += str(arg)
+        self.operating = False
+        self.compound = True
+    else :
+        kwargs_strs = sorted(["{0}={1}".format(k, _addQuotes(v)) 
+            for k, v in kwargs.items()])
+        input_strs = list(map(str, args)) + kwargs_strs
+        input_str = ", ".join(input_strs)
+        self._str += "({0})".format(input_str)
 
 
 def CreateLaterFunction(fcn, *args, **kwargs):
