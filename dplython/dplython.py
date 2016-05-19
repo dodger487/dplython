@@ -445,6 +445,9 @@ def mutate(*args, **kwargs):
 @ApplyToDataframe
 def group_by(*args, **kwargs):
   def GroupDF(df):
+    if args and max([len(arg.todo) for arg in args]) > 1:
+      raise ValueError(
+        "Expressions not allowed as positional args. Use keyword args.")
     group_columns = [arg.name for arg in args]
     if kwargs:
       group_columns.extend(kwargs.keys())
