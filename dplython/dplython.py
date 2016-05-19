@@ -183,7 +183,7 @@ class Later(object):
       self.todo = [lambda df: df]
     else:
       self.todo = [lambda df: df[self.name]]
-    self._str = 'data["{0}"]'.format(name)
+    self._str = 'X["{0}"]'.format(name)
   
   def applyFcns(self, df):
     self.origDf = df
