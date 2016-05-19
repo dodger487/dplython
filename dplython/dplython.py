@@ -300,11 +300,18 @@ class DplyFrame(DataFrame):
 
   def apply_on_groups(self, delayedFcn):
     outDf = self._grouped_self.apply(delayedFcn)
+
+    # Remove multi-index created from grouping and applying
     for grouped_name in outDf.index.names[:-1]:
       if grouped_name in outDf:
         outDf.reset_index(level=0, drop=True, inplace=True)
       else:
         outDf.reset_index(level=0, inplace=True)
+
+    # Drop all 0 index, created by summarize
+    if (outDf.index == 0).all():
+      outDf.reset_index(drop=True, inplace=True)
+
     outDf.group_self(self._grouped_on)
     return outDf
 
