@@ -420,7 +420,19 @@ def mutate(*args, **kwargs):
       else:
         df[str(arg)] = arg
 
-    for key, val in six.iteritems(kwargs):
+    columns = kwargs.pop("__order", None)
+    
+    if columns is not None:
+      if len(columns) != len(kwargs):
+        raise ValueError("".join(["__order has ",
+                                  str(len(columns)),
+                                  " but keyword arguments have ",
+                                  str(len(kwargs))]))
+      kv = [(key, kwargs[key]) for key in columns]
+    else:
+      kv = sorted(kwargs.items(), key = lambda e: e[0])
+    
+    for key, val in kv:
       if type(val) == Later:
         df[key] = val.applyFcns(df)
       else:
