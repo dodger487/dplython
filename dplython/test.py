@@ -172,6 +172,15 @@ class TestMutates(unittest.TestCase):
     self.assertEqual(col_names[-1], "carat3")
     self.assertTrue((diamonds_dp.carat + 3 == diamonds_dp.carat3).all())
 
+  def testOrderedKwargsError(self):
+  	self.assertRaisesRegexp(ValueError, "carat2", mutate,
+  							self.diamonds, carat1 = X.carat + 1,
+  							__order = ["carat1", "carat2"])
+
+  	self.assertRaisesRegexp(ValueError, "carat3", mutate,
+  							self.diamonds, carat1 = X.carat + 1, carat3 = X.carat + 3,
+  							__order = ["carat1"])
+
 
 class TestSelects(unittest.TestCase):
   diamonds = load_diamonds()

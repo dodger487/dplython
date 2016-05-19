@@ -420,15 +420,21 @@ def mutate(*args, **kwargs):
       else:
         df[str(arg)] = arg
 
-    columns = kwargs.pop("__order", None)
+    ordered = kwargs.pop("__order", None)
     
-    if columns is not None:
-      if len(columns) != len(kwargs):
-        raise ValueError("".join(["__order has ",
-                                  str(len(columns)),
-                                  " but keyword arguments have ",
-                                  str(len(kwargs))]))
-      kv = [(key, kwargs[key]) for key in columns]
+    if ordered is not None:
+      s1 = set(ordered)
+      s2 = set(kwargs)
+      
+      missing_order = s1 - s2
+      if (len(missing_order) > 0):
+      	raise ValueError(", ".join(missing_order) +
+      					 " in __order not found in keyword arguments")
+      
+      missing_kwargs = s2 - s1
+      if (len(missing_kwargs) > 0):
+      	raise ValueError(", ".join(missing_kwargs) + " not found in __order")        
+      kv = [(key, kwargs[key]) for key in ordered]
     else:
       kv = sorted(kwargs.items(), key = lambda e: e[0])
     
