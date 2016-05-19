@@ -69,6 +69,10 @@ class TestLaterStrMethod(unittest.TestCase):
     self.assertEqual(str(foo), '(-len(X["foo"])) + '
                                '(X["y"].mean() // '
                                'X["y"].median(X["z"]))')
+    bar = -(mylen(X.bar) + X.y.mean()) * X.y.median()
+    self.assertEqual(str(bar), '(-(len(X["bar"]) + X["y"].mean())) * '
+                               'X["y"].median()')
+
 
 
 class TestMutates(unittest.TestCase):
