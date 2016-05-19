@@ -66,9 +66,9 @@ class TestLaterStrMethod(unittest.TestCase):
   def test_more_later_ops_str(self):
     mylen = DelayFunction(len)
     foo = mylen(X.foo) + X.y.mean() // X.y.median(X.z)
-    self.assertEqual(str(foo), 'len(X["foo"]).__add__('
-                               'X["y"].mean().__floordiv__('
-                               'X["y"].median(X["z"])))')
+    self.assertEqual(str(foo), 'len(X["foo"]) + '
+                               '(X["y"].mean() // '
+                               '(X["y"].median(X["z"])))')
 
 
 class TestMutates(unittest.TestCase):
@@ -146,7 +146,7 @@ class TestMutates(unittest.TestCase):
   def testArgsNotKwargs(self):
     diamonds_dp = mutate(self.diamonds, X.carat+1)
     diamonds_pd = self.diamonds.copy()
-    diamonds_pd['X["carat"].__add__(1)'] = diamonds_pd.carat + 1
+    diamonds_pd['X["carat"] + (1)'] = diamonds_pd.carat + 1
     self.assertTrue(diamonds_pd.equals(diamonds_dp))
 
 

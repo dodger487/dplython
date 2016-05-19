@@ -177,6 +177,21 @@ class Later(object):
   carat     1.16     1.52     0.9    0.3     0.74    0.31
   price  7803.00  8299.00  4593.0  540.0  3315.00  816.00
   """
+  OPERATORS = {
+    "__add__": "+",
+    "__minus__": "-",
+    "__mul__": "*",
+    "__floordiv__": "//",
+    "__div__": "/",
+    "__mod__": "%",
+    "__pow__": "**",
+    "__lshift__": "<<",
+    "__rshift__": ">>",
+    "__and__": "&",
+    "__xor__": "^",
+    "__or__": "|"
+  }
+
   def __init__(self, name):
     self.name = name
     if name == "_":
@@ -213,7 +228,10 @@ class Later(object):
     return self.applyFcns(otherDf)
 
   def _UpdateStrAttr(self, attr):
-    self._str += ".{0}".format(attr)
+    if attr in self.OPERATORS:
+        self._str += " {0} ".format(self.OPERATORS[attr])
+    else:
+        self._str += ".{0}".format(attr)
 
   def _UpdateStrCallArgs(self, args, kwargs):
     # We sort here because keyword arguments get arbitrary ordering inside the 
