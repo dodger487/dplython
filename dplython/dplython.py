@@ -430,9 +430,13 @@ def mutate(*args, **kwargs):
 
 
 @ApplyToDataframe
-def group_by(*args):
+def group_by(*args, **kwargs):
   def GroupDF(df):
-    df.group_self([arg.name for arg in args])
+    group_columns = [arg.name for arg in args]
+    if kwargs:
+      group_columns.extend(kwargs.keys())
+      df = df >> mutate(**kwargs)
+    df.group_self(group_columns)
     return df
   return GroupDF
 
