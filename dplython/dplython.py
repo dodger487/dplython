@@ -212,6 +212,12 @@ class Later(object):
     otherDf = DplyFrame(df.copy(deep=True))
     return self.applyFcns(otherDf)
 
+  def __nonzero__(self):
+    raise ValueError("This python code evaluates if this Later is 'True' or "
+                     "'False' immediately, instead of waiting for the values "
+                     "to become available. This is ambiguous. Try writing your "
+                     "code inside a DelayFunction or use if_else.")
+
   def _UpdateStrAttr(self, attr):
     self._str += ".{0}".format(attr)
 
@@ -523,5 +529,14 @@ def nrow():
 def PairwiseGreater(series1, series2):
   index = series1.index
   newSeries = pandas.Series([max(s1, s2) for s1, s2 in zip(series1, series2)])
+  newSeries.index = index
+  return newSeries
+
+
+@DelayFunction
+def if_else(bool_series, series_true, series_false):
+  index = bool_series.index
+  newSeries = pandas.Series([s1 if b else s2 for b, s1, s2
+      in zip(bool_series, series_true, series_false)])
   newSeries.index = index
   return newSeries

@@ -513,5 +513,25 @@ class TestFunctionForm(unittest.TestCase):
     self.assertEqual(len(normal), len(function))
     
 
+class TestIfElse(unittest.TestCase):
+  diamonds = load_diamonds()
+
+  def test_if_else(self):
+    foo = self.diamonds >> mutate(
+        conditional_results= if_else(X.cut == "Premium", X.color, X.clarity))
+    bar = [color if cut == "Premium" else clarity for color, clarity, cut
+        in zip(self.diamonds.color, self.diamonds.clarity, self.diamonds.cut)]
+    bar = pd.Series(bar)
+    self.assertTrue(foo["conditional_results"].equals(bar))
+
+  # Porting dplyr tests:
+  # https://github.com/hadley/dplyr/blob/master/tests/testthat/test-if-else.R
+  def test_if_else_work(self):
+    x = pd.Series([-1, 0, 1])
+    zeros = pd.Series([0, 0, 0])
+    self.assertTrue(if_else(x < 0, x, zeros).equals(pd.Series([-1, 0, 0])))
+    self.assertTrue(if_else(x > 0, x, zeros).equals(pd.Series([0, 0, 1])))
+
+
 if __name__ == '__main__':
   unittest.main()
