@@ -149,6 +149,38 @@ class TestMutates(unittest.TestCase):
     diamonds_pd['data["carat"].__add__(1)'] = diamonds_pd.carat + 1
     self.assertTrue(diamonds_pd.equals(diamonds_dp))
 
+  def testOrderedKwargs(self):
+    # without __order, is alphabetical
+    diamonds_dp = mutate(self.diamonds,
+                         carat2=X.carat+2,
+                         carat1=X.carat+1,
+                         carat3=X.carat+3)
+    col_names = diamonds_dp.columns.values
+    self.assertEqual(col_names[-3], "carat1")
+    self.assertEqual(col_names[-2], "carat2")
+    self.assertEqual(col_names[-1], "carat3")
+
+    diamonds_dp = mutate(self.diamonds,
+                         carat2=X.carat+2,
+                         carat1=X.carat2-1,
+                         carat3=X.carat1+2,
+                         __order=["carat2", "carat1", "carat3"])
+    
+    col_names = diamonds_dp.columns.values
+    self.assertEqual(col_names[-3], "carat2")
+    self.assertEqual(col_names[-2], "carat1")
+    self.assertEqual(col_names[-1], "carat3")
+    self.assertTrue((diamonds_dp.carat + 3 == diamonds_dp.carat3).all())
+
+  def testOrderedKwargsError(self):
+  	self.assertRaisesRegexp(ValueError, "carat2", mutate,
+  							self.diamonds, carat1 = X.carat + 1,
+  							__order = ["carat1", "carat2"])
+
+  	self.assertRaisesRegexp(ValueError, "carat3", mutate,
+  							self.diamonds, carat1 = X.carat + 1, carat3 = X.carat + 3,
+  							__order = ["carat1"])
+
 
 class TestSelects(unittest.TestCase):
   diamonds = load_diamonds()

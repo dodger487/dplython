@@ -433,7 +433,25 @@ def mutate(*args, **kwargs):
       else:
         df[str(arg)] = arg
 
-    for key, val in six.iteritems(kwargs):
+    ordered = kwargs.pop("__order", None)
+    
+    if ordered is not None:
+      s1 = set(ordered)
+      s2 = set(kwargs)
+      
+      missing_order = s1 - s2
+      if (len(missing_order) > 0):
+      	raise ValueError(", ".join(missing_order) +
+      					 " in __order not found in keyword arguments")
+      
+      missing_kwargs = s2 - s1
+      if (len(missing_kwargs) > 0):
+      	raise ValueError(", ".join(missing_kwargs) + " not found in __order")        
+      kv = [(key, kwargs[key]) for key in ordered]
+    else:
+      kv = sorted(kwargs.items(), key = lambda e: e[0])
+    
+    for key, val in kv:
       if type(val) == Later:
         df[key] = val.applyFcns(df)
       else:
