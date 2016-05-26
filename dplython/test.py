@@ -309,6 +309,36 @@ class TestGroupBy(unittest.TestCase):
                     mutate(caratMean2=X.carat.mean()))
     self.assertTrue(diamonds_dp["caratMean1"].equals(diamonds_dp["caratMean2"]))
 
+  def testGroupByWithArgsAndKwargs(self):
+    diamonds_pd = self.diamonds.copy()
+    diamonds_pd['appearance'] = diamonds_pd['color'] + diamonds_pd['clarity']
+    diamonds_pd = diamonds_pd.groupby(['cut', 'appearance'])['price'].sum()
+    diamonds_grouped = (
+      self.diamonds >>
+      group_by(X.cut, appearance=X.color + X.clarity) >>
+      summarize(total_price=X.price.sum())
+    )
+    for row in diamonds_grouped.itertuples():
+      self.assertEqual(row.total_price, diamonds_pd[row.cut][row.appearance])
+
+  def testGroupyByWithKwargsOnly(self):
+    diamonds_pd = self.diamonds.copy()
+    diamonds_pd['appearance'] = diamonds_pd['color'] + diamonds_pd['clarity']
+    diamonds_pd = diamonds_pd.groupby(['appearance'])['price'].sum()
+    diamonds_grouped = (
+      self.diamonds >>
+      group_by(appearance=X.color + X.clarity) >>
+      summarize(total_price=X.price.sum())
+    )
+    for row in diamonds_grouped.itertuples():
+      self.assertEqual(row.total_price, diamonds_pd[row.appearance])
+
+  def testPositionalArgExpressionRaises(self):
+    with self.assertRaises(ValueError):
+      (self.diamonds >>
+        group_by(X.color + X.clarity) >>
+        summarize(total_price=X.price.sum()))
+
 
 class TestArrange(unittest.TestCase):
   diamonds = load_diamonds()
