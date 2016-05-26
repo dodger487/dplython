@@ -66,11 +66,11 @@ class TestLaterStrMethod(unittest.TestCase):
   def test_more_later_ops_str(self):
     mylen = DelayFunction(len)
     foo = -mylen(X.foo) + X.y.mean() // X.y.median(X.z)
-    self.assertEqual(str(foo), '(-len(X["foo"])) + '
+    self.assertEqual(str(foo), '-len(X["foo"]) + '
                                '(X["y"].mean() // '
                                'X["y"].median(X["z"]))')
     bar = -(mylen(X.bar) + X.y.mean()) * X.y.median()
-    self.assertEqual(str(bar), '(-(len(X["bar"]) + X["y"].mean())) * '
+    self.assertEqual(str(bar), '-(len(X["bar"]) + X["y"].mean()) * '
                                'X["y"].median()')
 
 

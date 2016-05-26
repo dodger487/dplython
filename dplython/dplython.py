@@ -253,21 +253,21 @@ class Later(object):
     # function call. Support PEP 0468 to help fix this issue!
     # https://www.python.org/dev/peps/pep-0468/
     if self.operating:
-        if len(args):
-            # binary operator
-            arg = args[0]
-            if type(arg) is Later and arg.compound:
-                self._str += "(" + str(arg) + ")"
-            else:
-                self._str += str(arg)
+      if len(args):
+        # binary operator
+        arg = args[0]
+        if type(arg) is Later and arg.compound:
+          self._str += "(" + str(arg) + ")"
+        else:
+          self._str += str(arg)
         self.operating = False
         self.compound = True
     else :
-        kwargs_strs = sorted(["{0}={1}".format(k, _addQuotes(v)) 
-            for k, v in kwargs.items()])
-        input_strs = list(map(str, args)) + kwargs_strs
-        input_str = ", ".join(input_strs)
-        self._str += "({0})".format(input_str)
+      kwargs_strs = sorted(["{0}={1}".format(k, _addQuotes(v)) 
+                            for k, v in kwargs.items()])
+      input_strs = list(map(str, args)) + kwargs_strs
+      input_str = ", ".join(input_strs)
+      self._str += "({0})".format(input_str)
 
 
 def CreateLaterFunction(fcn, *args, **kwargs):
