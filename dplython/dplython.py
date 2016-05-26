@@ -21,35 +21,6 @@ from pandas import DataFrame
 __version__ = "0.0.4"
 
 
-# TODOs:
-# add len to Later
-
-# * Descending and ascending for arrange
-# * diamonds >> select(-X.cut)
-# * Move special function Later code into Later object
-# * Add more tests
-# * Reflection thing in Later -- understand this better
-# * Should rename some things to be clearer. "df" isn't really a df in the 
-    # __radd__ code, for example 
-# * lint
-# * Let users use strings instead of Laters in certain situations
-#     e.g. select("cut", "carat")
-# * What about implementing Manager as a container as well? This would help
-#     with situations where column names have spaces. X["type of horse"]
-# * Should I enforce that output is a dataframe?
-#     For example, should df >> (lambda x: 7) be allowed?
-# * Pass args, kwargs into sample
-
-# Scratch
-# https://mtomassoli.wordpress.com/2012/03/18/currying-in-python/
-# http://stackoverflow.com/questions/16372229/how-to-catch-any-method-called-on-an-object-in-python
-# Sort of define your own operators: http://code.activestate.com/recipes/384122/
-# http://pandas.pydata.org/pandas-docs/stable/internals.html
-# I think it might be possible to override __rrshift__ and possibly leave 
-#   the pandas dataframe entirely alone.
-# http://www.rafekettler.com/magicmethods.html
-
-
 class Manager(object):
   """Object which helps create a delayed computational unit.
 
