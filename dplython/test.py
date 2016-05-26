@@ -595,5 +595,14 @@ class TestIfElse(unittest.TestCase):
     self.assertTrue(if_else(x > 0, x, zeros).equals(pd.Series([0, 0, 1])))
 
 
+class TestRename(unittest.TestCase):
+  diamonds = load_diamonds()
+
+  def test_rename(self):
+    renamed_df = self.diamonds >> rename(chair=X.table)
+    self.assertNotIn('table', renamed_df.columns)
+    self.assertIn('chair', renamed_df.columns)
+
+
 if __name__ == '__main__':
   unittest.main()
