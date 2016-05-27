@@ -521,6 +521,20 @@ def nrow():
   return lambda df: len(df)
 
 
+@ApplyToDataframe
+def rename(**kwargs):
+  """Rename one or more columns, leaving other columns unchanged
+
+  Example usage:
+    diamonds >> rename(new_name=old_name)
+  """
+  def rename_columns(df):
+    column_assignments = {old_name_later.name: new_name
+                          for new_name, old_name_later in kwargs.items()}
+    return df.rename(columns=column_assignments)
+  return rename_columns
+
+
 @DelayFunction
 def PairwiseGreater(series1, series2):
   index = series1.index
