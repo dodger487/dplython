@@ -150,6 +150,14 @@ def instrument_operator_hooks(cls):
 def _addQuotes(item):
   return '"' + item + '"' if isinstance(item, str) else item
 
+class Operator(object):
+
+  def __init__(self, symbol, precedence, binary, flipped):
+    self.symbol = symbol
+    self.precedence = precedence
+    self.binary = binary
+    self.flipped = flipped
+
 
 @instrument_operator_hooks
 class Later(object):
@@ -177,25 +185,33 @@ class Later(object):
   carat     1.16     1.52     0.9    0.3     0.74    0.31
   price  7803.00  8299.00  4593.0  540.0  3315.00  816.00
   """
-  BINARY_OPERATORS = {
-    "__add__": "+",
-    "__minus__": "-",
-    "__mul__": "*",
-    "__floordiv__": "//",
-    "__div__": "/",
-    "__mod__": "%",
-    "__pow__": "**",
-    "__lshift__": "<<",
-    "__rshift__": ">>",
-    "__and__": "&",
-    "__xor__": "^",
-    "__or__": "|"
-  }
 
-  UNARY_OPERATORS = {
-    "__neg__": "-",
-    "__pos__": "+",
-    "__invert__": "~"
+  OPERATORS = {
+    # see https://docs.python.org/2/reference/expressions.html#operator-precedence
+    "__or__": Operator(" | ", 7, True, False),
+    "__xor__": Operator(" ^ ", 8, True, False),
+    "__and__": Operator(" & ", 9, True, False),
+    "__lshift__": Operator(" << ", 10, True, False),
+    "__rlshift__": Operator(" << ", 10, True, True),
+    "__rshift__": Operator(" >> ", 10, True, False),
+    "__rrshift__": Operator(" >> ", 10, True, True),
+    "__add__": Operator(" + ", 11, True, False),
+    "__radd__": Operator(" + ", 11, True, True),
+    "__sub__": Operator(" - ", 11, True, False),
+    "__rsub__": Operator(" - ", 11, True, True),
+    "__mul__": Operator(" * ", 12, True, False),
+    "__rmul__": Operator(" * ", 12, True, True),
+    "__div__": Operator(" / ", 12, True, False),
+    "__rdiv__": Operator(" / ", 12, True, True),
+    "__floordiv__": Operator(" // ", 12, True, False),
+    "__rfloordiv__": Operator(" // ", 12, True, True),
+    "__mod__": Operator(" % ", 12, True, False),
+    "__rmod__": Operator(" % ", 12, True, True),
+    "__neg__": Operator("-", 13, False, False),
+    "__pos__": Operator("+", 13, False, False),
+    "__invert__": Operator("~", 13, False, False),
+    "__pow__": Operator(" ** ", 14, True, False),
+    "__rpow__": Operator(" ** ", 14, True, True)
   }
 
   def __init__(self, name):
@@ -206,7 +222,8 @@ class Later(object):
       self.todo = [lambda df: df[self.name]]
     self._str = 'X["{0}"]'.format(name)
     self.operating = False
-    self.compound = False
+    self.precedence = 17
+    self.flipped = False
   
   def applyFcns(self, df):
     self.origDf = df
@@ -236,17 +253,22 @@ class Later(object):
     return self.applyFcns(otherDf)
 
   def _UpdateStrAttr(self, attr):
-    if self.compound:
-        self._str = "(" + self._str + ")"
-        self.compound = False
-    if attr in self.BINARY_OPERATORS:
-        self._str += " {0} ".format(self.BINARY_OPERATORS[attr])
-        self.operating = True
-    elif attr in self.UNARY_OPERATORS:
-        self._str = self.UNARY_OPERATORS[attr] + self._str
-        self.operating = True
-    else:
-        self._str += ".{0}".format(attr)
+    try:
+      op = self.OPERATORS[attr]
+      if op.precedence > self.precedence:
+        self._str = "({0})".format(self._str)
+      if op.binary and not op.flipped:
+        self._str += op.symbol
+      else:
+        self._str = op.symbol + self._str
+      self.precedence = op.precedence   
+      self.flipped = op.flipped
+      self.operating = True
+    except KeyError:
+      if self.precedence < 15:
+        self._str = "({0})".format(self._str)
+      self.precedence = 15
+      self._str += ".{0}".format(attr)
 
   def _UpdateStrCallArgs(self, args, kwargs):
     # We sort here because keyword arguments get arbitrary ordering inside the 
@@ -256,13 +278,16 @@ class Later(object):
       if len(args):
         # binary operator
         arg = args[0]
-        if type(arg) is Later and arg.compound:
-          self._str += "(" + str(arg) + ")"
+        arg_string = str(arg)
+        if type(arg) == Later and arg.precedence < self.precedence:
+          arg_string = "(" + str(arg_string) + ")"
+        if self.flipped:
+          self._str = arg_string + self._str
         else:
-          self._str += str(arg)
-        self.operating = False
-        self.compound = True
-    else :
+          self._str += arg_string
+        self.flipped = False
+      self.operating = False
+    else:
       kwargs_strs = sorted(["{0}={1}".format(k, _addQuotes(v)) 
                             for k, v in kwargs.items()])
       input_strs = list(map(str, args)) + kwargs_strs
