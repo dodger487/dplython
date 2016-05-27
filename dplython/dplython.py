@@ -376,6 +376,26 @@ def select(*args):
   return lambda df: df[[column.name for column in args]]
 
 
+def _dict_to_possibly_ordered_tuples(dict_):
+  order = dict_.pop("__order", None)
+  if order:
+    ordered_keys = set(order)
+    dict_keys = set(dict_)
+
+    missing_order = ordered_keys - dict_keys
+    if missing_order:
+      raise ValueError(", ".join(missing_order) +
+                       " in __order not found in keyword arguments")
+
+    missing_kwargs = dict_keys - ordered_keys
+    if missing_kwargs:
+      raise ValueError(", ".join(missing_kwargs) + " not found in __order")
+
+    return [(key, dict_[key]) for key in order]
+  else:
+    return sorted(dict_.items(), key=lambda e: e[0])
+
+
 @ApplyToDataframe
 def mutate(*args, **kwargs):
   """Adds a column to the DataFrame.
@@ -403,25 +423,7 @@ def mutate(*args, **kwargs):
       else:
         df[str(arg)] = arg
 
-    ordered = kwargs.pop("__order", None)
-    
-    if ordered is not None:
-      s1 = set(ordered)
-      s2 = set(kwargs)
-      
-      missing_order = s1 - s2
-      if (len(missing_order) > 0):
-      	raise ValueError(", ".join(missing_order) +
-      					 " in __order not found in keyword arguments")
-      
-      missing_kwargs = s2 - s1
-      if (len(missing_kwargs) > 0):
-      	raise ValueError(", ".join(missing_kwargs) + " not found in __order")        
-      kv = [(key, kwargs[key]) for key in ordered]
-    else:
-      kv = sorted(kwargs.items(), key = lambda e: e[0])
-    
-    for key, val in kv:
+    for key, val in _dict_to_possibly_ordered_tuples(kwargs):
       if type(val) == Later:
         df[key] = val.applyFcns(df)
       else:
@@ -547,8 +549,8 @@ def transmute(**kwargs):
     1        652      7.73
     2        654      8.12
   """
-  mutate_dateframe_fn = mutate(**kwargs)
-  column_names = list(kwargs.keys())
+  mutate_dateframe_fn = mutate(**dict(kwargs))
+  column_names = [name for name, _ in _dict_to_possibly_ordered_tuples(kwargs)]
   return lambda df: mutate_dateframe_fn(df)[column_names]
 
 
