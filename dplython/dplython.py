@@ -373,7 +373,6 @@ def select(*args):
   1     E   0.21
   2     E   0.23
   """
-  names = [column.name for column in args]
   return lambda df: df[[column.name for column in args]]
 
 
@@ -533,6 +532,24 @@ def rename(**kwargs):
                           for new_name, old_name_later in kwargs.items()}
     return df.rename(columns=column_assignments)
   return rename_columns
+
+
+@ApplyToDataframe
+def transmute(**kwargs):
+  """ Similar to `select` but allows mutation in column definitions.
+
+  In : (diamonds >>
+          head(3) >>
+          transmute(new_price=X.price * 2, x_plus_y=X.x + X.y))
+  Out:
+        new_price  x_plus_y
+    0        652      7.93
+    1        652      7.73
+    2        654      8.12
+  """
+  mutate_dateframe_fn = mutate(**kwargs)
+  column_names = list(kwargs.keys())
+  return lambda df: mutate_dateframe_fn(df)[column_names]
 
 
 @DelayFunction
