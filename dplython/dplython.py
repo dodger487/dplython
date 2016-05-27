@@ -21,35 +21,6 @@ from pandas import DataFrame
 __version__ = "0.0.4"
 
 
-# TODOs:
-# add len to Later
-
-# * Descending and ascending for arrange
-# * diamonds >> select(-X.cut)
-# * Move special function Later code into Later object
-# * Add more tests
-# * Reflection thing in Later -- understand this better
-# * Should rename some things to be clearer. "df" isn't really a df in the 
-    # __radd__ code, for example 
-# * lint
-# * Let users use strings instead of Laters in certain situations
-#     e.g. select("cut", "carat")
-# * What about implementing Manager as a container as well? This would help
-#     with situations where column names have spaces. X["type of horse"]
-# * Should I enforce that output is a dataframe?
-#     For example, should df >> (lambda x: 7) be allowed?
-# * Pass args, kwargs into sample
-
-# Scratch
-# https://mtomassoli.wordpress.com/2012/03/18/currying-in-python/
-# http://stackoverflow.com/questions/16372229/how-to-catch-any-method-called-on-an-object-in-python
-# Sort of define your own operators: http://code.activestate.com/recipes/384122/
-# http://pandas.pydata.org/pandas-docs/stable/internals.html
-# I think it might be possible to override __rrshift__ and possibly leave 
-#   the pandas dataframe entirely alone.
-# http://www.rafekettler.com/magicmethods.html
-
-
 class Manager(object):
   """Object which helps create a delayed computational unit.
 
@@ -212,6 +183,12 @@ class Later(object):
     otherDf = DplyFrame(df.copy(deep=True))
     return self.applyFcns(otherDf)
 
+  def __nonzero__(self):
+    raise ValueError("This python code evaluates if this Later is 'True' or "
+                     "'False' immediately, instead of waiting for the values "
+                     "to become available. This is ambiguous. Try writing your "
+                     "code inside a DelayFunction or use if_else.")
+
   def _UpdateStrAttr(self, attr):
     self._str += ".{0}".format(attr)
 
@@ -300,11 +277,18 @@ class DplyFrame(DataFrame):
 
   def apply_on_groups(self, delayedFcn):
     outDf = self._grouped_self.apply(delayedFcn)
+
+    # Remove multi-index created from grouping and applying
     for grouped_name in outDf.index.names[:-1]:
       if grouped_name in outDf:
         outDf.reset_index(level=0, drop=True, inplace=True)
       else:
         outDf.reset_index(level=0, inplace=True)
+
+    # Drop all 0 index, created by summarize
+    if (outDf.index == 0).all():
+      outDf.reset_index(drop=True, inplace=True)
+
     outDf.group_self(self._grouped_on)
     return outDf
 
@@ -420,7 +404,25 @@ def mutate(*args, **kwargs):
       else:
         df[str(arg)] = arg
 
-    for key, val in six.iteritems(kwargs):
+    ordered = kwargs.pop("__order", None)
+    
+    if ordered is not None:
+      s1 = set(ordered)
+      s2 = set(kwargs)
+      
+      missing_order = s1 - s2
+      if (len(missing_order) > 0):
+      	raise ValueError(", ".join(missing_order) +
+      					 " in __order not found in keyword arguments")
+      
+      missing_kwargs = s2 - s1
+      if (len(missing_kwargs) > 0):
+      	raise ValueError(", ".join(missing_kwargs) + " not found in __order")        
+      kv = [(key, kwargs[key]) for key in ordered]
+    else:
+      kv = sorted(kwargs.items(), key = lambda e: e[0])
+    
+    for key, val in kv:
       if type(val) == Later:
         df[key] = val.applyFcns(df)
       else:
@@ -432,6 +434,9 @@ def mutate(*args, **kwargs):
 @ApplyToDataframe
 def group_by(*args, **kwargs):
   def GroupDF(df):
+    if args and max([len(arg.todo) for arg in args]) > 1:
+      raise ValueError(
+        "Expressions not allowed as positional args. Use keyword args.")
     group_columns = [arg.name for arg in args]
     if kwargs:
       group_columns.extend(kwargs.keys())
@@ -520,5 +525,14 @@ def nrow():
 def PairwiseGreater(series1, series2):
   index = series1.index
   newSeries = pandas.Series([max(s1, s2) for s1, s2 in zip(series1, series2)])
+  newSeries.index = index
+  return newSeries
+
+
+@DelayFunction
+def if_else(bool_series, series_true, series_false):
+  index = bool_series.index
+  newSeries = pandas.Series([s1 if b else s2 for b, s1, s2
+      in zip(bool_series, series_true, series_false)])
   newSeries.index = index
   return newSeries

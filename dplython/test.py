@@ -149,6 +149,38 @@ class TestMutates(unittest.TestCase):
     diamonds_pd['data["carat"].__add__(1)'] = diamonds_pd.carat + 1
     self.assertTrue(diamonds_pd.equals(diamonds_dp))
 
+  def testOrderedKwargs(self):
+    # without __order, is alphabetical
+    diamonds_dp = mutate(self.diamonds,
+                         carat2=X.carat+2,
+                         carat1=X.carat+1,
+                         carat3=X.carat+3)
+    col_names = diamonds_dp.columns.values
+    self.assertEqual(col_names[-3], "carat1")
+    self.assertEqual(col_names[-2], "carat2")
+    self.assertEqual(col_names[-1], "carat3")
+
+    diamonds_dp = mutate(self.diamonds,
+                         carat2=X.carat+2,
+                         carat1=X.carat2-1,
+                         carat3=X.carat1+2,
+                         __order=["carat2", "carat1", "carat3"])
+    
+    col_names = diamonds_dp.columns.values
+    self.assertEqual(col_names[-3], "carat2")
+    self.assertEqual(col_names[-2], "carat1")
+    self.assertEqual(col_names[-1], "carat3")
+    self.assertTrue((diamonds_dp.carat + 3 == diamonds_dp.carat3).all())
+
+  def testOrderedKwargsError(self):
+  	self.assertRaisesRegexp(ValueError, "carat2", mutate,
+  							self.diamonds, carat1 = X.carat + 1,
+  							__order = ["carat1", "carat2"])
+
+  	self.assertRaisesRegexp(ValueError, "carat3", mutate,
+  							self.diamonds, carat1 = X.carat + 1, carat3 = X.carat + 3,
+  							__order = ["carat1"])
+
 
 class TestSelects(unittest.TestCase):
   diamonds = load_diamonds()
@@ -300,6 +332,12 @@ class TestGroupBy(unittest.TestCase):
     )
     for row in diamonds_grouped.itertuples():
       self.assertEqual(row.total_price, diamonds_pd[row.appearance])
+
+  def testPositionalArgExpressionRaises(self):
+    with self.assertRaises(ValueError):
+      (self.diamonds >>
+        group_by(X.color + X.clarity) >>
+        summarize(total_price=X.price.sum()))
 
 
 class TestArrange(unittest.TestCase):
@@ -536,6 +574,26 @@ class TestFunctionForm(unittest.TestCase):
     function = sample_frac(self.diamonds, 0.1)
     self.assertEqual(len(normal), len(function))
     
+
+class TestIfElse(unittest.TestCase):
+  diamonds = load_diamonds()
+
+  def test_if_else(self):
+    foo = self.diamonds >> mutate(
+        conditional_results= if_else(X.cut == "Premium", X.color, X.clarity))
+    bar = [color if cut == "Premium" else clarity for color, clarity, cut
+        in zip(self.diamonds.color, self.diamonds.clarity, self.diamonds.cut)]
+    bar = pd.Series(bar)
+    self.assertTrue(foo["conditional_results"].equals(bar))
+
+  # Porting dplyr tests:
+  # https://github.com/hadley/dplyr/blob/master/tests/testthat/test-if-else.R
+  def test_if_else_work(self):
+    x = pd.Series([-1, 0, 1])
+    zeros = pd.Series([0, 0, 0])
+    self.assertTrue(if_else(x < 0, x, zeros).equals(pd.Series([-1, 0, 0])))
+    self.assertTrue(if_else(x > 0, x, zeros).equals(pd.Series([0, 0, 1])))
+
 
 if __name__ == '__main__':
   unittest.main()
