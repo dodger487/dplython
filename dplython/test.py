@@ -333,12 +333,17 @@ class TestGroupBy(unittest.TestCase):
     for row in diamonds_grouped.itertuples():
       self.assertEqual(row.total_price, diamonds_pd[row.appearance])
 
-  def testPositionalArgExpressionRaises(self):
-    with self.assertRaises(ValueError):
-      (self.diamonds >>
-        group_by(X.color + X.clarity) >>
-        summarize(total_price=X.price.sum()))
-
+  def testGroupByWithPositionalArg(self):
+    diamonds_pd = self.diamonds.copy()
+    diamonds_pd['appearance'] = diamonds_pd['color'] + diamonds_pd['clarity']
+    diamonds_pd = diamonds_pd.groupby(['cut', 'appearance'])['price'].sum()
+    diamonds_grouped = (
+      self.diamonds >>
+      group_by(X.cut, X.color + X.clarity) >>
+      summarize(total_price=X.price.sum())
+    )
+    for row in diamonds_grouped.itertuples():
+      self.assertEqual(row.total_price, diamonds_pd[row.cut][row._1])
 
 class TestArrange(unittest.TestCase):
   diamonds = load_diamonds()
