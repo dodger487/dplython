@@ -3,6 +3,7 @@
 
 """Dplyr-style operations on top of pandas DataFrame."""
 
+from functools import wraps
 import itertools
 import operator
 import sys
@@ -24,13 +25,14 @@ __version__ = "0.0.4"
 class Manager(object):
   """Object which helps create a delayed computational unit.
 
-  Typically will be set as a global variable X.
-  X.foo will refer to the "foo" column of the DataFrame in which it is later
+  Typically will be set as a global variable ``X``.
+  ``X.foo`` will refer to the ``"foo"`` column of the DataFrame in which it is later
   applied. 
 
   Manager can be used in two ways: 
-  (1) attribute notation: X.foo
-  (2) item notation: X["foo"]
+
+  1. attribute notation: ``X.foo``
+  2. item notation: ``X["foo"]``
 
   Attribute notation is preferred but item notation can be used in cases where 
   column names contain characters on which python will choke, such as spaces, 
@@ -132,7 +134,8 @@ class Later(object):
 
   Thus, we can refer to columns of the DataFrame as inputs to functions without 
   having the DataFrame currently available:
-  In : diamonds >> sift(X.carat > 4) >> select(X.carat, X.price)
+
+  >>> diamonds >> sift(X.carat > 4) >> select(X.carat, X.price)
   Out:
          carat  price
   25998   4.01  15223
@@ -141,8 +144,9 @@ class Later(object):
   27415   5.01  18018
   27630   4.50  18531
 
-  The special Later name, "_" will refer to the entire DataFrame. For example, 
-  In: diamonds >> sample_n(6) >> select(X.carat, X.price) >> X._.T
+  The special Later name, ``"_"`` will refer to the entire DataFrame. For example,
+
+  >>> diamonds >> sample_n(6) >> select(X.carat, X.price) >> X._.T
   Out:
            18966    19729   9445   49951    3087    33128
   carat     1.16     1.52     0.9    0.3     0.74    0.31
@@ -241,10 +245,13 @@ class DplyFrame(DataFrame):
   not collapsed and replaced with a function value.
   Second, >> is overloaded on the DataFrame so that functions on the right-hand
   side of this equation are called on the object. For example,
-  $ df >> select(X.carat)
+  
+  >>> df >> select(X.carat)
+  
   will call a function (created from the "select" call) on df.
 
   Currently, these inputs need to be one of the following:
+
   * A "Later" 
   * The "ungroup" function call
   * A function that returns a pandas DataFrame or DplyFrame.
@@ -310,6 +317,7 @@ class DplyFrame(DataFrame):
 
 
 def ApplyToDataframe(fcn):
+  @wraps(fcn)
   def DplyrFcn(*args, **kwargs):
     data_arg = None
     if len(args) > 0 and isinstance(args[0], pandas.DataFrame):
@@ -329,14 +337,16 @@ def sift(*args):
   """Filters rows of the data that meet input criteria.
 
   Giving multiple arguments to sift is equivalent to a logical "and".
-  In: df >> sift(X.carat > 4, X.cut == "Premium")
+  
+  >>> df >> sift(X.carat > 4, X.cut == "Premium")
   # Out:
   # carat      cut color clarity  depth  table  price      x  ...
   #  4.01  Premium     I      I1   61.0     61  15223  10.14
   #  4.01  Premium     J      I1   62.5     62  15223  10.02
   
-  As in pandas, use bitwise logical operators like |, &:
-  In: df >> sift((X.carat > 4) | (X.cut == "Ideal")) >> head(2)
+  As in pandas, use bitwise logical operators like ``|``, ``&``:
+  
+  >>> df >> sift((X.carat > 4) | (X.cut == "Ideal")) >> head(2)
   # Out:  carat    cut color clarity  depth ...
   #        0.23  Ideal     E     SI2   61.5     
   #        0.23  Ideal     J     VS1   62.8     
@@ -366,7 +376,8 @@ def select(*args):
 
   Output will be DplyFrame type. Order of columns will be the same as input into
   select.
-  In : diamonds >> select(X.color, X.carat) >> head(3)
+
+  >>> diamonds >> select(X.color, X.carat) >> head(3)
   Out:
     color  carat
   0     E   0.23
@@ -383,7 +394,7 @@ def mutate(*args, **kwargs):
 
   This can use existing columns of the DataFrame as input.
 
-  In : (diamonds >> 
+  >>> (diamonds >> 
           mutate(carat_bin=X.carat.round()) >> 
           group_by(X.cut, X.carat_bin) >> 
           summarize(avg_price=X.price.mean()))
@@ -475,7 +486,7 @@ def ungroup():
 def arrange(*args):
   """Sort DataFrame by the input column arguments.
 
-  In : diamonds >> sample_n(5) >> arrange(X.price) >> select(X.depth, X.price)
+  >>> diamonds >> sample_n(5) >> arrange(X.price) >> select(X.depth, X.price)
   Out:
          depth  price
   28547   61.0    675
