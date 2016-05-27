@@ -604,5 +604,19 @@ class TestRename(unittest.TestCase):
     self.assertIn('chair', renamed_df.columns)
 
 
+class TestTransmute(unittest.TestCase):
+  diamonds = load_diamonds()
+
+  def test_transmute(self):
+    mutate_select_df = (self.diamonds >>
+                        mutate(new_price=X.price * 2, x_plus_y=X.x + X.y,
+                               __order=['new_price', 'x_plus_y']) >>
+                        select(X.new_price, X.x_plus_y))
+    transmute_df = (self.diamonds >>
+                    transmute(new_price=X.price * 2, x_plus_y=X.x + X.y,
+                              __order=('new_price', 'x_plus_y')))
+    self.assertTrue(mutate_select_df.equals(transmute_df))
+
+
 if __name__ == '__main__':
   unittest.main()

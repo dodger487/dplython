@@ -384,8 +384,27 @@ def select(*args):
   1     E   0.21
   2     E   0.23
   """
-  names = [column.name for column in args]
   return lambda df: df[[column.name for column in args]]
+
+
+def _dict_to_possibly_ordered_tuples(dict_):
+  order = dict_.pop("__order", None)
+  if order:
+    ordered_keys = set(order)
+    dict_keys = set(dict_)
+
+    missing_order = ordered_keys - dict_keys
+    if missing_order:
+      raise ValueError(", ".join(missing_order) +
+                       " in __order not found in keyword arguments")
+
+    missing_kwargs = dict_keys - ordered_keys
+    if missing_kwargs:
+      raise ValueError(", ".join(missing_kwargs) + " not found in __order")
+
+    return [(key, dict_[key]) for key in order]
+  else:
+    return sorted(dict_.items(), key=lambda e: e[0])
 
 
 @ApplyToDataframe
@@ -415,25 +434,7 @@ def mutate(*args, **kwargs):
       else:
         df[str(arg)] = arg
 
-    ordered = kwargs.pop("__order", None)
-    
-    if ordered is not None:
-      s1 = set(ordered)
-      s2 = set(kwargs)
-      
-      missing_order = s1 - s2
-      if (len(missing_order) > 0):
-      	raise ValueError(", ".join(missing_order) +
-      					 " in __order not found in keyword arguments")
-      
-      missing_kwargs = s2 - s1
-      if (len(missing_kwargs) > 0):
-      	raise ValueError(", ".join(missing_kwargs) + " not found in __order")        
-      kv = [(key, kwargs[key]) for key in ordered]
-    else:
-      kv = sorted(kwargs.items(), key = lambda e: e[0])
-    
-    for key, val in kv:
+    for key, val in _dict_to_possibly_ordered_tuples(kwargs):
       if type(val) == Later:
         df[key] = val.applyFcns(df)
       else:
@@ -544,6 +545,24 @@ def rename(**kwargs):
                           for new_name, old_name_later in kwargs.items()}
     return df.rename(columns=column_assignments)
   return rename_columns
+
+
+@ApplyToDataframe
+def transmute(**kwargs):
+  """ Similar to `select` but allows mutation in column definitions.
+
+  In : (diamonds >>
+          head(3) >>
+          transmute(new_price=X.price * 2, x_plus_y=X.x + X.y))
+  Out:
+        new_price  x_plus_y
+    0        652      7.93
+    1        652      7.73
+    2        654      8.12
+  """
+  mutate_dateframe_fn = mutate(**dict(kwargs))
+  column_names = [name for name, _ in _dict_to_possibly_ordered_tuples(kwargs)]
+  return lambda df: mutate_dateframe_fn(df)[column_names]
 
 
 @DelayFunction
