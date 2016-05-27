@@ -7,6 +7,7 @@ import math
 import unittest
 import os
 
+import numpy as np
 import pandas as pd
 
 from dplython import *
@@ -344,6 +345,19 @@ class TestGroupBy(unittest.TestCase):
     )
     for row in diamonds_grouped.itertuples():
       self.assertEqual(row.total_price, diamonds_pd[row.cut][row._1])
+
+  def testGroupByIterable(self):
+    diamonds_pd = self.diamonds.copy()
+    random_labels = np.random.choice(['a', 'b'], len(self.diamonds))
+    diamonds_pd['label'] = random_labels
+    diamonds_pd = diamonds_pd.groupby(['label'])['price'].sum()
+    diamonds_grouped = (
+      self.diamonds >>
+      group_by(label=random_labels) >>
+      summarize(total_price=X.price.sum())
+    )
+    for row in diamonds_grouped.itertuples():
+      self.assertEqual(row.total_price, diamonds_pd[row.label])
 
 class TestArrange(unittest.TestCase):
   diamonds = load_diamonds()
