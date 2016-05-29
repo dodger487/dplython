@@ -293,6 +293,7 @@ class Later(object):
     "__mul__": BinaryOperator("*", 12),
     "__rmul__": ReverseBinaryOperator("*", 12),
     "__div__": BinaryOperator("/", 12),
+    "__truediv__": BinaryOperator("/", 12),
     "__rdiv__": ReverseBinaryOperator("/", 12),
     "__floordiv__": BinaryOperator("//", 12),
     "__rfloordiv__": ReverseBinaryOperator("//", 12),
