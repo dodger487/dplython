@@ -29,8 +29,8 @@ class TestLaterStrMethod(unittest.TestCase):
     self.assertEqual(str(foo), 'X["foo"]')
 
   def test_later_with_method(self):
-    foo = X.foo.mean
-    self.assertEqual(str(foo), 'X["foo"].mean')
+    foo = X.foo.mean()
+    self.assertEqual(str(foo), 'X["foo"].mean()')
 
   def test_later_with_method_call(self):
     foo = X.foo.mean()
@@ -74,8 +74,10 @@ class TestLaterStrMethod(unittest.TestCase):
                                'X["y"].median()')
     baz = 6 + (X.y.mean() % 4) - X.bar.sum()
     self.assertEqual(str(baz), '6 + X["y"].mean() % 4 - X["bar"].sum()')
-    baz = (X.bar / 4) == X.baz
-    self.assertEqual(str(baz), 'X["bar"] / 4 == X["baz"]')
+    buzz = (X.bar / 4) == X.baz
+    self.assertEqual(str(buzz), 'X["bar"] / 4 == X["baz"]')
+    biz = X.foo[4] / X.bar[2:3] + X.baz[::2]
+    self.assertEqual(str(biz), 'X["foo"][4] / X["bar"][2:3] + X["baz"][::2]')
 
 
 class TestMutates(unittest.TestCase):

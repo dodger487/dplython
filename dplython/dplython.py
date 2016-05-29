@@ -152,11 +152,96 @@ def _addQuotes(item):
 
 class Operator(object):
 
-  def __init__(self, symbol, precedence, binary, flipped):
+  def __init__(self, symbol, precedence):
     self.symbol = symbol
     self.precedence = precedence
-    self.binary = binary
-    self.flipped = flipped
+
+  def format_exp(self, exp):
+    if type(exp) == Later and exp._precedence < self.precedence:
+      return "({0})".format(str(exp))
+    else:
+      return str(exp)
+
+
+class BinaryOperator(Operator):
+  
+  def format_operation(self, obj, args, kwargs):
+    return "{0} {1} {2}".format(self.format_exp(obj),
+                                self.symbol,
+                                self.format_exp(args[0]))
+
+
+class ReverseBinaryOperator(Operator):
+  
+  def format_operation(self, obj, args, kwargs):
+    return "{2} {1} {0}".format(self.format_exp(obj),
+                                self.symbol,
+                                self.format_exp(args[0]))
+
+
+class UnaryOperator(Operator):
+
+  def format_operation(self, obj, args, kwargs):
+    return "{0}{1}".format(self.symbol,
+                           self.format_exp(obj))
+
+
+class FunctionOperator(Operator):
+
+  def __init__(self, symbol):
+    super(FunctionOperator, self).__init__(symbol, 15)
+
+  def format_args(self, args, kwargs):
+      # We sort here because keyword arguments get arbitrary ordering inside the 
+      # function call. Support PEP 0468 to help fix this issue!
+      # https://www.python.org/dev/peps/pep-0468/
+      kwarg_strs = sorted(["{0}={1}".format(k, _addQuotes(v)) 
+                            for k, v in kwargs.items()])
+      arg_strs = list(map(str, args))
+      full_str = ", ".join(arg_strs + kwarg_strs)
+      return full_str
+
+  def format_operation(self, obj, args, kwargs):
+    return "{0}({1})".format(self.symbol,
+                             self.format_args(args, kwargs))
+
+
+class MethodOperator(FunctionOperator):
+
+  def format_operation(self, obj, args, kwargs):
+    return "{0}.{1}({2})".format(self.format_exp(obj),
+                                 self.symbol,
+                                 self.format_args(args, kwargs))
+
+
+class BracketOperator(Operator):
+
+  def format_operation(self, obj, args, kwargs):
+    return "{0}[{1}]".format(self.format_exp(obj),
+                             self.format_arg(args[0]))
+
+  def format_arg(self, arg):
+    if isinstance(arg, slice):
+      _str = ""
+      (start, stop, step) = (arg.start, arg.stop, arg.step)
+      if start is not None:
+        _str += str(start)
+      _str += ":"
+      if stop is not None:
+        _str += str(stop)
+      if step is not None:
+        _str += ":" + str(step)
+      return _str
+    else:
+      return str(arg)
+
+
+class SliceOperator(BracketOperator):
+  """Necessary for compatibility."""
+
+  def format_operation(self, obj, args, kwargs):
+    return "{0}[{1}]".format(self.format_exp(obj),
+                             self.format_arg(slice(args[0], args[1])))
 
 
 @instrument_operator_hooks
@@ -186,38 +271,40 @@ class Later(object):
   price  7803.00  8299.00  4593.0  540.0  3315.00  816.00
   """
 
-  OPERATORS = {
+  _OPERATORS = {
     # see https://docs.python.org/2/reference/expressions.html#operator-precedence
-    "__lt__": Operator(" < ", 6, True, False),
-    "__le__": Operator(" <= ", 6, True, False),
-    "__eq__": Operator(" == ", 6, True, False),
-    "__ne__": Operator(" != ", 6, True, False),
-    "__ge__": Operator(" >= ", 6, True, False),
-    "__gt__": Operator(" > ", 6, True, False),
-    "__or__": Operator(" | ", 7, True, False),
-    "__xor__": Operator(" ^ ", 8, True, False),
-    "__and__": Operator(" & ", 9, True, False),
-    "__lshift__": Operator(" << ", 10, True, False),
-    "__rlshift__": Operator(" << ", 10, True, True),
-    "__rshift__": Operator(" >> ", 10, True, False),
-    "__rrshift__": Operator(" >> ", 10, True, True),
-    "__add__": Operator(" + ", 11, True, False),
-    "__radd__": Operator(" + ", 11, True, True),
-    "__sub__": Operator(" - ", 11, True, False),
-    "__rsub__": Operator(" - ", 11, True, True),
-    "__mul__": Operator(" * ", 12, True, False),
-    "__rmul__": Operator(" * ", 12, True, True),
-    "__div__": Operator(" / ", 12, True, False),
-    "__rdiv__": Operator(" / ", 12, True, True),
-    "__floordiv__": Operator(" // ", 12, True, False),
-    "__rfloordiv__": Operator(" // ", 12, True, True),
-    "__mod__": Operator(" % ", 12, True, False),
-    "__rmod__": Operator(" % ", 12, True, True),
-    "__neg__": Operator("-", 13, False, False),
-    "__pos__": Operator("+", 13, False, False),
-    "__invert__": Operator("~", 13, False, False),
-    "__pow__": Operator(" ** ", 14, True, False),
-    "__rpow__": Operator(" ** ", 14, True, True)
+    "__lt__": BinaryOperator("<", 6),
+    "__le__": BinaryOperator("<=", 6),
+    "__eq__": BinaryOperator("==", 6),
+    "__ne__": BinaryOperator("!=", 6),
+    "__ge__": BinaryOperator(">=", 6),
+    "__gt__": BinaryOperator(">", 6),
+    "__or__": BinaryOperator("|", 7),
+    "__xor__": BinaryOperator("^", 8),
+    "__and__": BinaryOperator("&", 9),
+    "__lshift__": BinaryOperator("<<", 10),
+    "__rlshift__": ReverseBinaryOperator("<<", 10),
+    "__rshift__": BinaryOperator(">>", 10),
+    "__rrshift__": ReverseBinaryOperator(">>", 10),
+    "__add__": BinaryOperator("+", 11),
+    "__radd__": ReverseBinaryOperator("+", 11),
+    "__sub__": BinaryOperator("-", 11),
+    "__rsub__": ReverseBinaryOperator("-", 11),
+    "__mul__": BinaryOperator("*", 12),
+    "__rmul__": ReverseBinaryOperator("*", 12),
+    "__div__": BinaryOperator("/", 12),
+    "__rdiv__": ReverseBinaryOperator("/", 12),
+    "__floordiv__": BinaryOperator("//", 12),
+    "__rfloordiv__": ReverseBinaryOperator("//", 12),
+    "__mod__": BinaryOperator("%", 12),
+    "__rmod__": ReverseBinaryOperator("%", 12),
+    "__neg__": UnaryOperator("-", 13),
+    "__pos__": UnaryOperator("+", 13),
+    "__invert__": UnaryOperator("~", 13),
+    "__pow__": BinaryOperator("**", 14),
+    "__rpow__": ReverseBinaryOperator("**", 14),
+    "__getitem__": BracketOperator("", 15),
+    "__getslice__": SliceOperator("", 15)
   }
 
   def __init__(self, name):
@@ -227,9 +314,8 @@ class Later(object):
     else:
       self.todo = [lambda df: df[self.name]]
     self._str = 'X["{0}"]'.format(name)
-    self.operating = False
-    self.precedence = 17
-    self.flipped = False
+    self._op = None
+    self._precedence = 17
   
   def applyFcns(self, df):
     self.origDf = df
@@ -259,46 +345,11 @@ class Later(object):
     return self.applyFcns(otherDf)
 
   def _UpdateStrAttr(self, attr):
-    try:
-      op = self.OPERATORS[attr]
-      if op.precedence > self.precedence:
-        self._str = "({0})".format(self._str)
-      if op.binary and not op.flipped:
-        self._str += op.symbol
-      else:
-        self._str = op.symbol + self._str
-      self.precedence = op.precedence   
-      self.flipped = op.flipped
-      self.operating = True
-    except KeyError:
-      if self.precedence < 15:
-        self._str = "({0})".format(self._str)
-      self.precedence = 15
-      self._str += ".{0}".format(attr)
+    self._op = self._OPERATORS.get(attr, MethodOperator(attr))
 
   def _UpdateStrCallArgs(self, args, kwargs):
-    # We sort here because keyword arguments get arbitrary ordering inside the 
-    # function call. Support PEP 0468 to help fix this issue!
-    # https://www.python.org/dev/peps/pep-0468/
-    if self.operating:
-      if len(args):
-        # binary operator
-        arg = args[0]
-        arg_string = str(arg)
-        if type(arg) == Later and arg.precedence < self.precedence:
-          arg_string = "(" + str(arg_string) + ")"
-        if self.flipped:
-          self._str = arg_string + self._str
-        else:
-          self._str += arg_string
-        self.flipped = False
-      self.operating = False
-    else:
-      kwargs_strs = sorted(["{0}={1}".format(k, _addQuotes(v)) 
-                            for k, v in kwargs.items()])
-      input_strs = list(map(str, args)) + kwargs_strs
-      input_str = ", ".join(input_strs)
-      self._str += "({0})".format(input_str)
+    self._str = self._op.format_operation(self, args, kwargs)
+    self._precedence = self._op.precedence
 
 
 def CreateLaterFunction(fcn, *args, **kwargs):
@@ -314,7 +365,7 @@ def CreateLaterFunction(fcn, *args, **kwargs):
         for k, v in six.iteritems(self.kwargs)}
     return self.fcn(*args, **kwargs)
   laterFcn.todo = [lambda df: apply_function(laterFcn, df)]
-  laterFcn._str = '{0}'.format(fcn.__name__)
+  laterFcn._op = FunctionOperator(fcn.__name__)
   laterFcn._UpdateStrCallArgs(args, kwargs)
   return laterFcn
   
