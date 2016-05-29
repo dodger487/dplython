@@ -434,7 +434,7 @@ def mutate(*args, **kwargs):
 @ApplyToDataframe
 def group_by(*args, **kwargs):
   def GroupDF(df):
-    group_columns = kwargs.keys()
+    group_columns = list(kwargs.keys())
     mutate_columns = kwargs
     for arg in args:
       if len(arg.todo) == 1:
