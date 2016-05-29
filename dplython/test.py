@@ -22,53 +22,62 @@ class TestLaterStrMethod(unittest.TestCase):
   
   def test_column_name(self):
     foo = X.foo
-    self.assertEqual(foo._str, 'data["foo"]')
+    self.assertEqual(foo._str, 'X["foo"]')
 
   def test_str(self):
     foo = X.foo
-    self.assertEqual(str(foo), 'data["foo"]')
+    self.assertEqual(str(foo), 'X["foo"]')
 
   def test_later_with_method(self):
-    foo = X.foo.mean
-    self.assertEqual(str(foo), 'data["foo"].mean')
+    foo = X.foo.mean()
+    self.assertEqual(str(foo), 'X["foo"].mean()')
 
   def test_later_with_method_call(self):
     foo = X.foo.mean()
-    self.assertEqual(str(foo), 'data["foo"].mean()')
+    self.assertEqual(str(foo), 'X["foo"].mean()')
     foo = X.foo.mean(1)
-    self.assertEqual(str(foo), 'data["foo"].mean(1)')
+    self.assertEqual(str(foo), 'X["foo"].mean(1)')
     foo = X.foo.mean(1, 2)
-    self.assertEqual(str(foo), 'data["foo"].mean(1, 2)')
+    self.assertEqual(str(foo), 'X["foo"].mean(1, 2)')
     foo = X.foo.mean(numeric_only=True)
-    self.assertEqual(str(foo), 'data["foo"].mean(numeric_only=True)')
+    self.assertEqual(str(foo), 'X["foo"].mean(numeric_only=True)')
     # The order is different here, because the original order of the kwargs is
     # lost when kwargs are passed to the function. To insure consistent results,
     #  the kwargs are sorted alphabetically by key. To help deal with this
     # issue, support PEP 0468: https://www.python.org/dev/peps/pep-0468/
     foo = X.foo.mean(numeric_only=True, level="bar")
-    self.assertEqual(str(foo), 'data["foo"].mean(level="bar", '
+    self.assertEqual(str(foo), 'X["foo"].mean(level="bar", '
                                'numeric_only=True)')
     foo = X.foo.mean(1, numeric_only=True, level="bar")
-    self.assertEqual(str(foo), 'data["foo"].mean(1, level="bar", '
+    self.assertEqual(str(foo), 'X["foo"].mean(1, level="bar", '
                                'numeric_only=True)')
     foo = X.foo.mean(1, 2, numeric_only=True, level="bar")
-    self.assertEqual(str(foo), 'data["foo"].mean(1, 2, level="bar", '
+    self.assertEqual(str(foo), 'X["foo"].mean(1, 2, level="bar", '
                                'numeric_only=True)')
     foo = X.foo.mean(X.y.mean())
-    self.assertEqual(str(foo), 'data["foo"].mean('
-                               'data["y"].mean())')
+    self.assertEqual(str(foo), 'X["foo"].mean('
+                               'X["y"].mean())')
 
   def test_later_with_delayed_function(self):
     mylen = DelayFunction(len)
     foo = mylen(X.foo)
-    self.assertEqual(str(foo), 'len(data["foo"])')
+    self.assertEqual(str(foo), 'len(X["foo"])')
 
   def test_more_later_ops_str(self):
     mylen = DelayFunction(len)
-    foo = mylen(X.foo) + X.y.mean() // X.y.median(X.z)
-    self.assertEqual(str(foo), 'len(data["foo"]).__add__('
-                               'data["y"].mean().__floordiv__('
-                               'data["y"].median(data["z"])))')
+    foo = -mylen(X.foo) + X.y.mean() // X.y.median()
+    self.assertEqual(str(foo), '-len(X["foo"]) + '
+                               'X["y"].mean() // '
+                               'X["y"].median()')
+    bar = -(mylen(X.bar) + X.y.mean()) * X.y.median()
+    self.assertEqual(str(bar), '-(len(X["bar"]) + X["y"].mean()) * '
+                               'X["y"].median()')
+    baz = 6 + (X.y.mean() % 4) - X.bar.sum()
+    self.assertEqual(str(baz), '6 + X["y"].mean() % 4 - X["bar"].sum()')
+    buzz = (X.bar / 4) == X.baz
+    self.assertEqual(str(buzz), 'X["bar"] / 4 == X["baz"]')
+    biz = X.foo[4] / X.bar[2:3] + X.baz[::2]
+    self.assertEqual(str(biz), 'X["foo"][4] / X["bar"][2:3] + X["baz"][::2]')
 
 
 class TestMutates(unittest.TestCase):
@@ -146,7 +155,7 @@ class TestMutates(unittest.TestCase):
   def testArgsNotKwargs(self):
     diamonds_dp = mutate(self.diamonds, X.carat+1)
     diamonds_pd = self.diamonds.copy()
-    diamonds_pd['data["carat"].__add__(1)'] = diamonds_pd.carat + 1
+    diamonds_pd['X["carat"] + 1'] = diamonds_pd.carat + 1
     self.assertTrue(diamonds_pd.equals(diamonds_dp))
 
   def testOrderedKwargs(self):
