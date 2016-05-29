@@ -188,6 +188,12 @@ class Later(object):
 
   OPERATORS = {
     # see https://docs.python.org/2/reference/expressions.html#operator-precedence
+    "__lt__": Operator(" < ", 6, True, False),
+    "__le__": Operator(" <= ", 6, True, False),
+    "__eq__": Operator(" == ", 6, True, False),
+    "__ne__": Operator(" != ", 6, True, False),
+    "__ge__": Operator(" >= ", 6, True, False),
+    "__gt__": Operator(" > ", 6, True, False),
     "__or__": Operator(" | ", 7, True, False),
     "__xor__": Operator(" ^ ", 8, True, False),
     "__and__": Operator(" & ", 9, True, False),

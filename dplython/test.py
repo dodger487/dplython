@@ -74,6 +74,8 @@ class TestLaterStrMethod(unittest.TestCase):
                                'X["y"].median()')
     baz = 6 + (X.y.mean() % 4) - X.bar.sum()
     self.assertEqual(str(baz), '6 + X["y"].mean() % 4 - X["bar"].sum()')
+    baz = (X.bar / 4) == X.baz
+    self.assertEqual(str(baz), 'X["bar"] / 4 == X["baz"]')
 
 
 class TestMutates(unittest.TestCase):
