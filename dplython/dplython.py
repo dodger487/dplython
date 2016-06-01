@@ -26,34 +26,6 @@ __version__ = "0.0.4"
 def _addQuotes(item):
   return '"' + item + '"' if isinstance(item, str) else item
 
-# TODOs:
-# add len to Later
-
-# * Descending and ascending for arrange
-# * diamonds >> select(-X.cut)
-# * Move special function Later code into Later object
-# * Add more tests
-# * Reflection thing in Later -- understand this better
-# * Should rename some things to be clearer. "df" isn't really a df in the 
-    # __radd__ code, for example 
-# * lint
-# * Let users use strings instead of Laters in certain situations
-#     e.g. select("cut", "carat")
-# * What about implementing Manager as a container as well? This would help
-#     with situations where column names have spaces. X["type of horse"]
-# * Should I enforce that output is a dataframe?
-#     For example, should df >> (lambda x: 7) be allowed?
-# * Pass args, kwargs into sample
-
-# Scratch
-# https://mtomassoli.wordpress.com/2012/03/18/currying-in-python/
-# http://stackoverflow.com/questions/16372229/how-to-catch-any-method-called-on-an-object-in-python
-# Sort of define your own operators: http://code.activestate.com/recipes/384122/
-# http://pandas.pydata.org/pandas-docs/stable/internals.html
-# I think it might be possible to override __rrshift__ and possibly leave 
-#   the pandas dataframe entirely alone.
-# http://www.rafekettler.com/magicmethods.html
-
 
 class DplyFrame(DataFrame):
   """A subclass of the pandas DataFrame with methods for function piping.
@@ -118,7 +90,6 @@ class DplyFrame(DataFrame):
     return outDf
 
   def __rshift__(self, delayedFcn):
-
     if type(delayedFcn) == Later:
       return delayedFcn.evaluate(self)
 
@@ -126,12 +97,16 @@ class DplyFrame(DataFrame):
       otherDf = DplyFrame(self.copy(deep=True))
       return delayedFcn(otherDf)
 
-    if self._grouped_self:
-      outDf = self.apply_on_groups(delayedFcn)
-      return outDf
-    else:
-      otherDf = DplyFrame(self.copy(deep=True))
-      return delayedFcn(otherDf)
+    # if isinstance(delayedFcn, mutate):
+    #   otherDf = DplyFrame(self.copy(deep=True))
+    #   return delayedFcn(otherDf)
+
+    # if self._grouped_self:
+    #   outDf = self.apply_on_groups(delayedFcn)
+    #   return outDf
+    # else:
+    otherDf = DplyFrame(self.copy(deep=True))
+    return delayedFcn(otherDf)
 
 
 def ApplyToDataframe(fcn):
@@ -226,40 +201,78 @@ def _dict_to_possibly_ordered_tuples(dict_):
     return sorted(dict_.items(), key=lambda e: e[0])
 
 
-@ApplyToDataframe
-def mutate(*args, **kwargs):
-  """Adds a column to the DataFrame.
+class Verb(object):
 
-  This can use existing columns of the DataFrame as input.
+  def do(self):
+    raise NotImplementedError()
 
-  >>> (diamonds >> 
-          mutate(carat_bin=X.carat.round()) >> 
-          group_by(X.cut, X.carat_bin) >> 
-          summarize(avg_price=X.price.mean()))
-  Out:
-         avg_price  carat_bin        cut
-  0     863.908535          0      Ideal
-  1    4213.864948          1      Ideal
-  2   12838.984078          2      Ideal
-  ...
-  27  13466.823529          3       Fair
-  28  15842.666667          4       Fair
-  29  18018.000000          5       Fair
-  """
-  def addColumns(df):
-    for arg in args:
+
+class mutate(Verb):
+
+  __name__ = "mutate"
+
+  def __new__(cls, *args, **kwargs):
+    if len(args) > 0 and isinstance(args[0], pandas.DataFrame):
+      m = mutate(*args[1:], **kwargs)
+      return m(args[0].copy(deep=True))
+    else:
+      return super(mutate, cls).__new__(cls)
+
+  def __init__(self, *args, **kwargs):
+    self.args = args
+    self.kwargs = kwargs
+
+  def __call__(self, df):
+    for arg in self.args:
       if isinstance(arg, Later):
         df[str(arg)] = arg.evaluate(df)
       else:
         df[str(arg)] = arg
 
-    for key, val in _dict_to_possibly_ordered_tuples(kwargs):
+    for key, val in _dict_to_possibly_ordered_tuples(self.kwargs):
       if type(val) == Later:
         df[key] = val.evaluate(df)
       else:
         df[key] = val
     return df
-  return addColumns
+
+  def __rrshift__(self, other):
+    return self.__call__(DplyFrame(other.copy(deep=True)))
+
+# @ApplyToDataframe
+# def mutate(*args, **kwargs):
+#   """Adds a column to the DataFrame.
+
+#   This can use existing columns of the DataFrame as input.
+
+#   >>> (diamonds >> 
+#           mutate(carat_bin=X.carat.round()) >> 
+#           group_by(X.cut, X.carat_bin) >> 
+#           summarize(avg_price=X.price.mean()))
+#   Out:
+#          avg_price  carat_bin        cut
+#   0     863.908535          0      Ideal
+#   1    4213.864948          1      Ideal
+#   2   12838.984078          2      Ideal
+#   ...
+#   27  13466.823529          3       Fair
+#   28  15842.666667          4       Fair
+#   29  18018.000000          5       Fair
+#   """
+#   def addColumns(df):
+#     for arg in args:
+#       if isinstance(arg, Later):
+#         df[str(arg)] = arg.applyFcns(df)
+#       else:
+#         df[str(arg)] = arg
+
+#     for key, val in _dict_to_possibly_ordered_tuples(kwargs):
+#       if type(val) == Later:
+#         df[key] = val.applyFcns(df)
+#       else:
+#         df[key] = val
+#     return df
+#   return addColumns
 
 
 @ApplyToDataframe
