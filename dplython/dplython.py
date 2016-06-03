@@ -16,7 +16,8 @@ import numpy as np
 import pandas
 from pandas import DataFrame
 
-from later import Later, CreateLaterFunction, DelayFunction
+from later import (Later, CreateLaterFunction, DelayFunction, X,
+                   Manager)
 
 __version__ = "0.0.4"
 
@@ -48,31 +49,6 @@ __version__ = "0.0.4"
 # I think it might be possible to override __rrshift__ and possibly leave 
 #   the pandas dataframe entirely alone.
 # http://www.rafekettler.com/magicmethods.html
-
-
-class Manager(object):
-  """Object which helps create a delayed computational unit.
-
-  Typically will be set as a global variable X.
-  X.foo will refer to the "foo" column of the DataFrame in which it is later
-  applied. 
-
-  Manager can be used in two ways: 
-  (1) attribute notation: X.foo
-  (2) item notation: X["foo"]
-
-  Attribute notation is preferred but item notation can be used in cases where 
-  column names contain characters on which python will choke, such as spaces, 
-  periods, and so forth.
-  """
-  def __getattr__(self, attr):
-    return Later(attr)
-
-  def __getitem__(self, key):
-    return Later(key)
-
-
-X = Manager()
 
 
 class DplyFrame(DataFrame):
@@ -130,7 +106,7 @@ class DplyFrame(DataFrame):
   def __rshift__(self, delayedFcn):
 
     if type(delayedFcn) == Later:
-      return delayedFcn.applyFcns(self)
+      return delayedFcn.evaluate(self)
 
     if delayedFcn == UngroupDF:
       otherDf = DplyFrame(self.copy(deep=True))
@@ -181,7 +157,7 @@ def sift(*args):
     final_filter = pandas.Series([True for t in range(len(df))])
     final_filter.index = df.index
     for arg in args:
-      stmt = arg.applyFcns(df)
+      stmt = arg.evaluate(df)
       final_filter = final_filter & stmt
     if final_filter.dtype != bool:
       raise Exception("Inputs to filter must be boolean")
@@ -235,13 +211,13 @@ def mutate(*args, **kwargs):
   def addColumns(df):
     for arg in args:
       if isinstance(arg, Later):
-        df[str(arg)] = arg.applyFcns(df)
+        df[str(arg)] = arg.evaluate(df)
       else:
         df[str(arg)] = arg
 
     for key, val in six.iteritems(kwargs):
       if type(val) == Later:
-        df[key] = val.applyFcns(df)
+        df[key] = val.evaluate(df)
       else:
         df[key] = val
     return df
@@ -259,7 +235,7 @@ def group_by(*args):
 @ApplyToDataframe
 def summarize(**kwargs):
   def CreateSummarizedDf(df):
-    input_dict = {k: val.applyFcns(df) for k, val in six.iteritems(kwargs)}
+    input_dict = {k: val.evaluate(df) for k, val in six.iteritems(kwargs)}
     if len(input_dict) == 0:
       return DplyFrame({}, index=index)
     if hasattr(df, "_current_group") and df._current_group:
