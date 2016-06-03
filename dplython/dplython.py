@@ -267,7 +267,7 @@ def group_by(*args, **kwargs):
     group_columns = list(kwargs.keys())
     mutate_columns = kwargs
     for arg in args:
-      if len(arg.todo) == 1:
+      if arg.name is not None:
         group_columns.append(arg.name)
       else:
         group_columns.append(str(arg))

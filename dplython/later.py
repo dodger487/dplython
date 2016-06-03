@@ -336,21 +336,6 @@ class Later(object):
 
 def CreateLaterFunction(fcn, *args, **kwargs):
   return Later(FunctionStep(fcn, *args, **kwargs), IdentityStep())
-  # laterFcn = Later(fcn.__name__)
-  # laterFcn.fcn = fcn
-  # laterFcn.args = args
-  # laterFcn.kwargs = kwargs
-  # def apply_function(self, df):
-  #   self.origDf = df
-  #   args = [a.evaluate(self.origDf) if type(a) == Later else a 
-  #       for a in self.args]
-  #   kwargs = {k: v.evaluate(self.origDf) if type(v) == Later else v 
-  #       for k, v in six.iteritems(self.kwargs)}
-  #   return self.fcn(*args, **kwargs)
-  # laterFcn.todo = [lambda df: apply_function(laterFcn, df)]
-  # laterFcn._op = FunctionOperator(fcn.__name__)
-  # laterFcn._UpdateStrCallArgs(args, kwargs)
-  # return laterFcn
 
 def DelayFunction(fcn):
   def DelayedFcnCall(*args, **kwargs):
