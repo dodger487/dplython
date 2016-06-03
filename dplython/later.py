@@ -42,7 +42,7 @@ class Operator(object):
     return func(*args)
 
   def format_exp(self, exp):
-    if type(exp) == Later and exp.step.precedence < self.precedence:
+    if type(exp) == Later and exp._step.precedence < self.precedence:
       return "({0})".format(str(exp))
     else:
       return str(exp)
@@ -80,7 +80,7 @@ class Step(object):
     raise NotImplementedError
 
   def format_exp(self, exp):
-    if type(exp) == Later and exp.step.precedence < self.precedence:
+    if type(exp) == Later and exp._step.precedence < self.precedence:
       return "({0})".format(str(exp))
     else:
       return str(exp)
@@ -154,7 +154,7 @@ class AttributeStep(Step):
 
   def __init__(self, attr):
     self.attr = attr
-    super(AttributeStep, self).__init__("", 15)
+    super(AttributeStep, self).__init__(15)
 
   def format_operation(self, obj):
     return "{0}.{1}".format(self.format_exp(obj),
@@ -186,7 +186,7 @@ class BracketStep(Step):
       if step is not None:
         _str += ":" + str(step)
       return _str
-    elif isinstance(self.key, basestring):
+    elif isinstance(self.key, str):
       return '"{0}"'.format(self.key)
     else:
       return str(self.key)
@@ -297,17 +297,17 @@ class Later(object):
   """
 
   def __init__(self, step, previous, name = None):
-    self.step = step
-    self.previous = previous
-    self.name = name
+    self._step = step
+    self._previous = previous
+    self._name = name
 
   def evaluate(self, previousResult, original=None):
     original = original if original is not None else previousResult
-    previousResult = self.previous.evaluate(previousResult, original)
-    return self.step.evaluate(previousResult, original)
+    previousResult = self._previous.evaluate(previousResult, original)
+    return self._step.evaluate(previousResult, original)
     
   def __str__(self):
-    return self.step.format_operation(self.previous)
+    return self._step.format_operation(self._previous)
 
   def __repr__(self):
     return str(self)

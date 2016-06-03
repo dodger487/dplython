@@ -202,7 +202,7 @@ def select(*args):
   1     E   0.21
   2     E   0.23
   """
-  return lambda df: df[[column.name for column in args]]
+  return lambda df: df[[column._name for column in args]]
 
 
 def _dict_to_possibly_ordered_tuples(dict_):
@@ -267,8 +267,8 @@ def group_by(*args, **kwargs):
     group_columns = list(kwargs.keys())
     mutate_columns = kwargs
     for arg in args:
-      if arg.name is not None:
-        group_columns.append(arg.name)
+      if arg._name is not None:
+        group_columns.append(arg._name)
       else:
         group_columns.append(str(arg))
         mutate_columns[str(arg)] = arg
@@ -318,7 +318,7 @@ def arrange(*args):
   3468    61.6   3392
   23829   62.0  11903
   """
-  names = [column.name for column in args]
+  names = [column._name for column in args]
   def f(df):
     sortby_df = df >> mutate(*args)
     index = sortby_df.sort_values([str(arg) for arg in args]).index
@@ -363,7 +363,7 @@ def rename(**kwargs):
     diamonds >> rename(new_name=old_name)
   """
   def rename_columns(df):
-    column_assignments = {old_name_later.name: new_name
+    column_assignments = {old_name_later._name: new_name
                           for new_name, old_name_later in kwargs.items()}
     return df.rename(columns=column_assignments)
   return rename_columns
