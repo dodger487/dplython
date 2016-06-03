@@ -42,8 +42,6 @@ class Operator(object):
     return func(*args)
 
   def format_exp(self, exp):
-    print exp.precedence
-    print self.precedence
     if type(exp) == Later and exp.step.precedence < self.precedence:
       return "({0})".format(str(exp))
     else:
