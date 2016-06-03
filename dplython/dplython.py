@@ -17,77 +17,42 @@ import numpy as np
 import pandas
 from pandas import DataFrame
 
-from later import Later, CreateLaterFunction, DelayFunction
+from later import (Later, CreateLaterFunction, DelayFunction, X,
+                   Manager)
 
 __version__ = "0.0.4"
 
 
-class Manager(object):
-  """Object which helps create a delayed computational unit.
-
-  Typically will be set as a global variable ``X``.
-  ``X.foo`` will refer to the ``"foo"`` column of the DataFrame in which it is later
-  applied. 
-
-  Manager can be used in two ways: 
-
-  1. attribute notation: ``X.foo``
-  2. item notation: ``X["foo"]``
-
-  Attribute notation is preferred but item notation can be used in cases where 
-  column names contain characters on which python will choke, such as spaces, 
-  periods, and so forth.
-  """
-  def __getattr__(self, attr):
-    return Later(attr)
-
-  def __getitem__(self, key):
-    return Later(key)
-
-
-X = Manager()
-
-def create_reversible_func(func_name):
-  def reversible_func(self, arg):
-    self._UpdateStrAttr(func_name)
-    self._UpdateStrCallArgs([arg], {})
-    def use_operator(df):
-      if isinstance(arg, Later):
-        altered_arg = arg.applyFcns(self.origDf)
-      else:
-        altered_arg = arg
-      return getattr(operator, func_name)(df, altered_arg)
-
-    self.todo.append(use_operator)
-    return self
-  return reversible_func
-
-def instrument_operator_hooks(cls):
-  def add_hook(name):
-    def op_hook(self, *args, **kwargs):
-      self._UpdateStrAttr(name)
-      self._UpdateStrCallArgs(args, kwargs)
-      if len(args) > 0 and type(args[0]) == Later:
-        self.todo.append(lambda df: getattr(df, name)(args[0].applyFcns(self.origDf)))
-      else:  
-        self.todo.append(lambda df: getattr(df, name)(*args, **kwargs))
-      return self
-
-    try:
-      setattr(cls, name, op_hook)
-    except (AttributeError, TypeError):
-      pass  # skip __name__ and __doc__ and the like
-
-  for hook_name in normal_operators:
-    add_hook(hook_name)
-
-  for func_name, rfunc_name in reversible_operators:
-    setattr(cls, func_name, create_reversible_func(func_name))
-
-  return cls
-
 def _addQuotes(item):
   return '"' + item + '"' if isinstance(item, str) else item
+
+# TODOs:
+# add len to Later
+
+# * Descending and ascending for arrange
+# * diamonds >> select(-X.cut)
+# * Move special function Later code into Later object
+# * Add more tests
+# * Reflection thing in Later -- understand this better
+# * Should rename some things to be clearer. "df" isn't really a df in the 
+    # __radd__ code, for example 
+# * lint
+# * Let users use strings instead of Laters in certain situations
+#     e.g. select("cut", "carat")
+# * What about implementing Manager as a container as well? This would help
+#     with situations where column names have spaces. X["type of horse"]
+# * Should I enforce that output is a dataframe?
+#     For example, should df >> (lambda x: 7) be allowed?
+# * Pass args, kwargs into sample
+
+# Scratch
+# https://mtomassoli.wordpress.com/2012/03/18/currying-in-python/
+# http://stackoverflow.com/questions/16372229/how-to-catch-any-method-called-on-an-object-in-python
+# Sort of define your own operators: http://code.activestate.com/recipes/384122/
+# http://pandas.pydata.org/pandas-docs/stable/internals.html
+# I think it might be possible to override __rrshift__ and possibly leave 
+#   the pandas dataframe entirely alone.
+# http://www.rafekettler.com/magicmethods.html
 
 
 class DplyFrame(DataFrame):
@@ -155,7 +120,7 @@ class DplyFrame(DataFrame):
   def __rshift__(self, delayedFcn):
 
     if type(delayedFcn) == Later:
-      return delayedFcn.applyFcns(self)
+      return delayedFcn.evaluate(self)
 
     if delayedFcn == UngroupDF:
       otherDf = DplyFrame(self.copy(deep=True))
@@ -209,7 +174,7 @@ def sift(*args):
     final_filter = pandas.Series([True for t in range(len(df))])
     final_filter.index = df.index
     for arg in args:
-      stmt = arg.applyFcns(df)
+      stmt = arg.evaluate(df)
       final_filter = final_filter & stmt
     if final_filter.dtype != bool:
       raise Exception("Inputs to filter must be boolean")
@@ -283,13 +248,13 @@ def mutate(*args, **kwargs):
   def addColumns(df):
     for arg in args:
       if isinstance(arg, Later):
-        df[str(arg)] = arg.applyFcns(df)
+        df[str(arg)] = arg.evaluate(df)
       else:
         df[str(arg)] = arg
 
     for key, val in _dict_to_possibly_ordered_tuples(kwargs):
       if type(val) == Later:
-        df[key] = val.applyFcns(df)
+        df[key] = val.evaluate(df)
       else:
         df[key] = val
     return df
@@ -318,7 +283,7 @@ def group_by(*args, **kwargs):
 @ApplyToDataframe
 def summarize(**kwargs):
   def CreateSummarizedDf(df):
-    input_dict = {k: val.applyFcns(df) for k, val in six.iteritems(kwargs)}
+    input_dict = {k: val.evaluate(df) for k, val in six.iteritems(kwargs)}
     if len(input_dict) == 0:
       return DplyFrame({}, index=index)
     if hasattr(df, "_current_group") and df._current_group:

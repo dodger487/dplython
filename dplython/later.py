@@ -1,154 +1,185 @@
 import operator
 
-reversible_operators = [
-    ["__add__", "__radd__"],
-    ["__sub__", "__rsub__"],
-    ["__mul__", "__rmul__"],
-    ["__floordiv__", "__rfloordiv__"],
-    ["__div__", "__rdiv__"],
-    ["__truediv__", "__rtruediv__"],
-    ["__mod__", "__rmod__"],
-    ["__divmod__", "__rdivmod__"],
-    ["__pow__", "__rpow__"],
-    ["__lshift__", "__rlshift__"],
-    ["__rshift__", "__rrshift__"],
-    ["__and__", "__rand__"],
-    ["__or__", "__ror__"],
-    ["__xor__", "__rxor__"],
-]
+# reversible_operators = [
+#     ["__add__", "__radd__"],
+#     ["__sub__", "__rsub__"],
+#     ["__mul__", "__rmul__"],
+#     ["__floordiv__", "__rfloordiv__"],
+#     ["__div__", "__rdiv__"],
+#     ["__truediv__", "__rtruediv__"],
+#     ["__mod__", "__rmod__"],
+#     ["__divmod__", "__rdivmod__"],
+#     ["__pow__", "__rpow__"],
+#     ["__lshift__", "__rlshift__"],
+#     ["__rshift__", "__rrshift__"],
+#     ["__and__", "__rand__"],
+#     ["__or__", "__ror__"],
+#     ["__xor__", "__rxor__"],
+# ]
 
-normal_operators = [
-    "__abs__", "__concat__", "__contains__", "__delitem__", "__delslice__",
-    "__eq__", "__file__", "__ge__", "__getitem__", "__getslice__", "__gt__", 
-    "__iadd__", "__iand__", "__iconcat__", "__idiv__", "__ifloordiv__", 
-    "__ilshift__", "__imod__", "__imul__", "__index__", "__inv__", "__invert__",
-    "__ior__", "__ipow__", "__irepeat__", "__irshift__", "__isub__", 
-    "__itruediv__", "__ixor__", "__le__", "__lt__", "__ne__", "__neg__",
-    "__not__", "__package__", "__pos__", "__repeat__", "__setitem__",
-    "__setslice__", "__radd__", "__rsub__", "__rmul__", "__rfloordiv__",
-    "__rdiv__", "__rtruediv__", "__rmod__", "__rdivmod__", "__rpow__", 
-    "__rlshift__",  "__rand__",  "__ror__",  "__rxor__",  # "__rrshift__",
-]
-
-
-def create_reversible_func(func_name):
-  def reversible_func(self, arg):
-    self._UpdateStrAttr(func_name)
-    self._UpdateStrCallArgs([arg], {})
-    def use_operator(df):
-      if isinstance(arg, Later):
-        altered_arg = arg.applyFcns(self.origDf)
-      else:
-        altered_arg = arg
-      return getattr(operator, func_name)(df, altered_arg)
-
-    self.todo.append(use_operator)
-    return self
-  return reversible_func
-
-
-def instrument_operator_hooks(cls):
-  def add_hook(name):
-    def op_hook(self, *args, **kwargs):
-      self._UpdateStrAttr(name)
-      self._UpdateStrCallArgs(args, kwargs)
-      if len(args) > 0 and type(args[0]) == Later:
-        self.todo.append(lambda df: getattr(df, name)(args[0].applyFcns(self.origDf)))
-      else:  
-        self.todo.append(lambda df: getattr(df, name)(*args, **kwargs))
-      return self
-
-    try:
-      setattr(cls, name, op_hook)
-    except (AttributeError, TypeError):
-      pass  # skip __name__ and __doc__ and the like
-
-  for hook_name in normal_operators:
-    add_hook(hook_name)
-
-  for func_name, rfunc_name in reversible_operators:
-    setattr(cls, func_name, create_reversible_func(func_name))
-
-  return cls
-
-
-def _addQuotes(item):
-  return '"' + item + '"' if isinstance(item, str) else item
+# normal_operators = [
+#     "__abs__", "__concat__", "__contains__", "__delitem__", "__delslice__",
+#     "__eq__", "__file__", "__ge__", "__getitem__", "__getslice__", "__gt__", 
+#     "__iadd__", "__iand__", "__iconcat__", "__idiv__", "__ifloordiv__", 
+#     "__ilshift__", "__imod__", "__imul__", "__index__", "__inv__", "__invert__",
+#     "__ior__", "__ipow__", "__irepeat__", "__irshift__", "__isub__", 
+#     "__itruediv__", "__ixor__", "__le__", "__lt__", "__ne__", "__neg__",
+#     "__not__", "__package__", "__pos__", "__repeat__", "__setitem__",
+#     "__setslice__", "__radd__", "__rsub__", "__rmul__", "__rfloordiv__",
+#     "__rdiv__", "__rtruediv__", "__rmod__", "__rdivmod__", "__rpow__", 
+#     "__rlshift__",  "__rand__",  "__ror__",  "__rxor__",  # "__rrshift__",
+# ]
 
 class Operator(object):
 
-  def __init__(self, symbol, precedence):
-    self.symbol = symbol
+  def __init__(self, name, symbol, precedence):
+    self.name = name
+    self.format_string = self.get_format_string(symbol)
     self.precedence = precedence
 
+  def apply(self, *args, **kwargs):
+    func = getattr(operator, self.name)
+    return func(*args)
+
   def format_exp(self, exp):
-    if type(exp) == Later and exp._precedence < self.precedence:
+    print exp.precedence
+    print self.precedence
+    if type(exp) == Later and exp.step.precedence < self.precedence:
       return "({0})".format(str(exp))
     else:
       return str(exp)
 
+  def format_operation(self, *args, **kwargs):
+    return self.format_string.format(*args)
+
 
 class BinaryOperator(Operator):
-  
-  def format_operation(self, obj, args, kwargs):
-    return "{0} {1} {2}".format(self.format_exp(obj),
-                                self.symbol,
-                                self.format_exp(args[0]))
+
+  def get_format_string(self, symbol):
+    return "{0} " + symbol + " {1}"
 
 
 class ReverseBinaryOperator(Operator):
   
-  def format_operation(self, obj, args, kwargs):
-    return "{2} {1} {0}".format(self.format_exp(obj),
-                                self.symbol,
-                                self.format_exp(args[0]))
+  def get_format_string(self, symbol):
+    return "{1} " + symbol + " {0}"
 
 
 class UnaryOperator(Operator):
 
-  def format_operation(self, obj, args, kwargs):
-    return "{0}{1}".format(self.symbol,
-                           self.format_exp(obj))
+  def get_format_string(self, symbol):
+    return symbol + "{0}"
 
 
-class FunctionOperator(Operator):
+class Step(object):
 
-  def __init__(self, symbol):
-    super(FunctionOperator, self).__init__(symbol, 15)
+  def __init__(self, precedence, *args, **kwargs):
+    self.precedence = precedence
+    self.args = args
+    self.kwargs = kwargs
 
-  def format_args(self, args, kwargs):
+  def format_operation(self, obj):
+    raise NotImplementedError
+
+  def format_exp(self, exp):
+    if type(exp) == Later and exp.step.precedence < self.precedence:
+      return "({0})".format(str(exp))
+    else:
+      return str(exp)
+
+  def evaluated_args(self, df):
+    return [(arg.evaluate(df) if isinstance(arg, Later) else arg) 
+            for arg in self.args]
+
+
+class OperatorStep(Step):
+
+  def __init__(self, operator, *args, **kwargs):
+    self.operator = operator
+    super(OperatorStep, self).__init__(operator.precedence, 
+                                       *args, 
+                                       **kwargs)
+
+  def evaluate(self, previousResult, original):
+    return self.operator.apply(previousResult, 
+                               *self.evaluated_args(original), 
+                               **self.kwargs)
+
+  def format_operation(self, obj):
+    formatted_args = [self.format_exp(arg) for arg in [obj] + list(self.args)]
+    return self.operator.format_operation(*formatted_args, **self.kwargs)
+
+
+class ArgStep(Step):
+
+  def format_args(self):
       # We sort here because keyword arguments get arbitrary ordering inside the 
       # function call. Support PEP 0468 to help fix this issue!
       # https://www.python.org/dev/peps/pep-0468/
       kwarg_strs = sorted(["{0}={1}".format(k, _addQuotes(v)) 
-                            for k, v in kwargs.items()])
-      arg_strs = list(map(str, args))
+                            for k, v in self.kwargs.items()])
+      arg_strs = list(map(str, self.args))
       full_str = ", ".join(arg_strs + kwarg_strs)
       return full_str
 
-  def format_operation(self, obj, args, kwargs):
-    return "{0}({1})".format(self.symbol,
-                             self.format_args(args, kwargs))
+
+class CallStep(ArgStep):
+
+  def __init__(self, *args, **kwargs):
+    super(CallStep, self).__init__(15, *args, **kwargs)
+
+  def format_operation(self, obj):
+    return "{0}({1})".format(obj,
+                             self.format_args())
+
+  def evaluate(self, previousResult, original):
+    return previousResult.__call__(*self.evaluated_args(original), 
+                                   **self.kwargs)
 
 
-class MethodOperator(FunctionOperator):
+class FunctionStep(ArgStep):
 
-  def format_operation(self, obj, args, kwargs):
-    return "{0}.{1}({2})".format(self.format_exp(obj),
-                                 self.symbol,
-                                 self.format_args(args, kwargs))
+  def __init__(self, func, *args, **kwargs):
+    self.func = func
+    super(FunctionStep, self).__init__(15, *args, **kwargs)
+
+  def format_operation(self, obj):
+    return "{0}({1})".format(self.func.__name__,
+                             self.format_args())
+
+  def evaluate(self, previousResult, original):
+    return self.func(*self.evaluated_args(original), 
+                     **self.kwargs)
 
 
-class BracketOperator(Operator):
+class AttributeStep(Step):
 
-  def format_operation(self, obj, args, kwargs):
-    return "{0}[{1}]".format(self.format_exp(obj),
-                             self.format_arg(args[0]))
+  def __init__(self, attr):
+    self.attr = attr
+    super(AttributeStep, self).__init__("", 15)
 
-  def format_arg(self, arg):
-    if isinstance(arg, slice):
+  def format_operation(self, obj):
+    return "{0}.{1}".format(self.format_exp(obj),
+                            self.attr)
+
+  def evaluate(self, previousResult, original):
+    return getattr(previousResult, self.attr)
+
+
+class BracketStep(Step):
+
+  def __init__(self, key):
+    self.key = key
+    super(BracketStep, self).__init__(15)
+
+  def format_operation(self, obj):
+    return '{0}[{1}]'.format(self.format_exp(obj),
+                             self.format_arg())
+
+  def format_arg(self):
+    if isinstance(self.key, slice):
       _str = ""
-      (start, stop, step) = (arg.start, arg.stop, arg.step)
+      (start, stop, step) = (self.key.start, self.key.stop, self.key.step)
       if start is not None:
         _str += str(start)
       _str += ":"
@@ -157,11 +188,16 @@ class BracketOperator(Operator):
       if step is not None:
         _str += ":" + str(step)
       return _str
+    elif isinstance(self.key, basestring):
+      return '"{0}"'.format(self.key)
     else:
-      return str(arg)
+      return str(self.key)
+
+  def evaluate(self, previousResult, original):
+    return operator.getitem(previousResult, self.key)
 
 
-class SliceOperator(BracketOperator):
+class SliceStep(BracketStep):
   """Necessary for compatibility."""
 
   def format_operation(self, obj, args, kwargs):
@@ -169,7 +205,73 @@ class SliceOperator(BracketOperator):
                              self.format_arg(slice(args[0], args[1])))
 
 
-@instrument_operator_hooks
+class IdentityStep(Step):
+
+  def __init__(self):
+    super(IdentityStep, self).__init__(17)
+
+  def evaluate(self, previousResult, original):
+    return previousResult
+
+
+OPERATORS = {
+  # see https://docs.python.org/2/reference/expressions.html#operator-precedence
+  "__lt__": BinaryOperator("__lt__", "<", 6),
+  "__le__": BinaryOperator("__le__", "<=", 6),
+  "__eq__": BinaryOperator("__eq__", "==", 6),
+  "__ne__": BinaryOperator("__ne__", "!=", 6),
+  "__ge__": BinaryOperator("__ge__", ">=", 6),
+  "__gt__": BinaryOperator("__gt__", ">", 6),
+  "__or__": BinaryOperator("__or__", "|", 7),
+  "__ror__": ReverseBinaryOperator("__or__", "|", 7),
+  "__xor__": BinaryOperator("__xor__", "^", 8),
+  "__rxor__": ReverseBinaryOperator("__xor__", "^", 8),
+  "__and__": BinaryOperator("__and__", "&", 9),
+  "__rand__": ReverseBinaryOperator("__and__", "&", 9),
+  "__lshift__": BinaryOperator("__lshift__", "<<", 10),
+  "__rlshift__": ReverseBinaryOperator("__lshift__", "<<", 10),
+  "__rshift__": BinaryOperator("__rshift__", ">>", 10),
+  "__rrshift__": ReverseBinaryOperator("__rshift__", ">>", 10),
+  "__add__": BinaryOperator("__add__", "+", 11),
+  "__radd__": ReverseBinaryOperator("__add__", "+", 11),
+  "__sub__": BinaryOperator("__sub__", "-", 11),
+  "__rsub__": ReverseBinaryOperator("__sub__", "-", 11),
+  "__mul__": BinaryOperator("__mul__", "*", 12),
+  "__rmul__": ReverseBinaryOperator("__mul__", "*", 12),
+  "__div__": BinaryOperator("__div__", "/", 12),
+  "__rdiv__": ReverseBinaryOperator("__div__", "/", 12),
+  "__truediv__": BinaryOperator("__truediv__", "/", 12),
+  "__rtruediv__": ReverseBinaryOperator("__truediv__", "/", 12),
+  "__floordiv__": BinaryOperator("__floordiv__", "//", 12),
+  "__rfloordiv__": ReverseBinaryOperator("__floordiv__", "//", 12),
+  "__mod__": BinaryOperator("__mod__", "%", 12),
+  "__rmod__": ReverseBinaryOperator("__mod__", "%", 12),
+  "__neg__": UnaryOperator("__neg__", "-", 13),
+  "__pos__": UnaryOperator("__pos__", "+", 13),
+  "__invert__": UnaryOperator("__invert__", "~", 13),
+  "__pow__": BinaryOperator("__pow__", "**", 14),
+  "__rpow__": ReverseBinaryOperator("__pow__", "**", 14),
+}
+
+def add_operator_hooks(cls):
+
+  def get_hook(name):
+    operator = OPERATORS[name]
+    def op_hook(self, *args, **kwargs):
+      return Later(OperatorStep(operator, *args, **kwargs), self)
+    return op_hook
+
+  for name in OPERATORS:
+    setattr(cls, name, get_hook(name))
+
+  return cls
+
+
+def _addQuotes(item):
+  return '"' + item + '"' if isinstance(item, str) else item
+
+
+@add_operator_hooks
 class Later(object):
   """Object which represents a computation to be carried out later.
 
@@ -196,107 +298,59 @@ class Later(object):
   price  7803.00  8299.00  4593.0  540.0  3315.00  816.00
   """
 
-  _OPERATORS = {
-    # see https://docs.python.org/2/reference/expressions.html#operator-precedence
-    "__lt__": BinaryOperator("<", 6),
-    "__le__": BinaryOperator("<=", 6),
-    "__eq__": BinaryOperator("==", 6),
-    "__ne__": BinaryOperator("!=", 6),
-    "__ge__": BinaryOperator(">=", 6),
-    "__gt__": BinaryOperator(">", 6),
-    "__or__": BinaryOperator("|", 7),
-    "__ror__": ReverseBinaryOperator("|", 7),
-    "__xor__": BinaryOperator("^", 8),
-    "__rxor__": ReverseBinaryOperator("^", 8),
-    "__and__": BinaryOperator("&", 9),
-    "__rand__": BinaryOperator("&", 9),
-    "__lshift__": BinaryOperator("<<", 10),
-    "__rlshift__": ReverseBinaryOperator("<<", 10),
-    "__rshift__": BinaryOperator(">>", 10),
-    "__rrshift__": ReverseBinaryOperator(">>", 10),
-    "__add__": BinaryOperator("+", 11),
-    "__radd__": ReverseBinaryOperator("+", 11),
-    "__sub__": BinaryOperator("-", 11),
-    "__rsub__": ReverseBinaryOperator("-", 11),
-    "__mul__": BinaryOperator("*", 12),
-    "__rmul__": ReverseBinaryOperator("*", 12),
-    "__div__": BinaryOperator("/", 12),
-    "__rdiv__": ReverseBinaryOperator("/", 12),
-    "__truediv__": BinaryOperator("/", 12),
-    "__rtruediv__": ReverseBinaryOperator("/", 12),
-    "__floordiv__": BinaryOperator("//", 12),
-    "__rfloordiv__": ReverseBinaryOperator("//", 12),
-    "__mod__": BinaryOperator("%", 12),
-    "__rmod__": ReverseBinaryOperator("%", 12),
-    "__neg__": UnaryOperator("-", 13),
-    "__pos__": UnaryOperator("+", 13),
-    "__invert__": UnaryOperator("~", 13),
-    "__pow__": BinaryOperator("**", 14),
-    "__rpow__": ReverseBinaryOperator("**", 14),
-    "__getitem__": BracketOperator("", 15),
-    "__getslice__": SliceOperator("", 15)
-  }
-
-  def __init__(self, name):
+  def __init__(self, step, previous, name = None):
+    self.step = step
+    self.previous = previous
     self.name = name
-    if name == "_":
-      self.todo = [lambda df: df]
-    else:
-      self.todo = [lambda df: df[self.name]]
-    self._str = 'X["{0}"]'.format(name)
-    self._op = None
-    self._precedence = 17
-  
-  def applyFcns(self, df):
-    self.origDf = df
-    stmt = df
-    for func in self.todo:
-      stmt = func(stmt)
-    return stmt
+
+  def evaluate(self, previousResult, original=None):
+    original = original if original is not None else previousResult
+    previousResult = self.previous.evaluate(previousResult, original)
+    return self.step.evaluate(previousResult, original)
     
   def __str__(self):
-    return "{0}".format(self._str)
+    return self.step.format_operation(self.previous)
 
   def __repr__(self):
-    return "{0}".format(self._str)
+    return str(self)
 
   def __getattr__(self, attr):
-    self.todo.append(lambda df: getattr(df, attr))
-    self._UpdateStrAttr(attr)
-    return self
+    return Later(AttributeStep(attr), self)
+
+  def __getitem__(self, attr):
+    return Later(BracketStep(attr), self)
 
   def __call__(self, *args, **kwargs):
-    self.todo.append(lambda foo: foo.__call__(*args, **kwargs))
-    self._UpdateStrCallArgs(args, kwargs)
-    return self
+    return Later(CallStep(*args, **kwargs), self)
 
   def __rrshift__(self, df):
     otherDf = DplyFrame(df.copy(deep=True))
-    return self.applyFcns(otherDf)
+    return self.evaluate(otherDf)
 
-  def _UpdateStrAttr(self, attr):
-    self._op = self._OPERATORS.get(attr, MethodOperator(attr))
+  # def _UpdateStrAttr(self, attr):
+  #   self._op = OPERATORS.get(attr, AttributeOperator(attr))
 
-  def _UpdateStrCallArgs(self, args, kwargs):
-    self._str = self._op.format_operation(self, args, kwargs)
-    self._precedence = self._op.precedence
+  # def _UpdateStrCallArgs(self, args, kwargs):
+  #   self._str = self._op.format_operation(self, args, kwargs)
+  #   self._precedence = self._op.precedence
 
 def CreateLaterFunction(fcn, *args, **kwargs):
-  laterFcn = Later(fcn.__name__)
-  laterFcn.fcn = fcn
-  laterFcn.args = args
-  laterFcn.kwargs = kwargs
-  def apply_function(self, df):
-    self.origDf = df
-    args = [a.applyFcns(self.origDf) if type(a) == Later else a 
-        for a in self.args]
-    kwargs = {k: v.applyFcns(self.origDf) if type(v) == Later else v 
-        for k, v in six.iteritems(self.kwargs)}
-    return self.fcn(*args, **kwargs)
-  laterFcn.todo = [lambda df: apply_function(laterFcn, df)]
-  laterFcn._op = FunctionOperator(fcn.__name__)
-  laterFcn._UpdateStrCallArgs(args, kwargs)
-  return laterFcn
+  return Later(FunctionStep(fcn, *args, **kwargs), IdentityStep())
+  # laterFcn = Later(fcn.__name__)
+  # laterFcn.fcn = fcn
+  # laterFcn.args = args
+  # laterFcn.kwargs = kwargs
+  # def apply_function(self, df):
+  #   self.origDf = df
+  #   args = [a.evaluate(self.origDf) if type(a) == Later else a 
+  #       for a in self.args]
+  #   kwargs = {k: v.evaluate(self.origDf) if type(v) == Later else v 
+  #       for k, v in six.iteritems(self.kwargs)}
+  #   return self.fcn(*args, **kwargs)
+  # laterFcn.todo = [lambda df: apply_function(laterFcn, df)]
+  # laterFcn._op = FunctionOperator(fcn.__name__)
+  # laterFcn._UpdateStrCallArgs(args, kwargs)
+  # return laterFcn
 
 def DelayFunction(fcn):
   def DelayedFcnCall(*args, **kwargs):
@@ -309,4 +363,43 @@ def DelayFunction(fcn):
 
   return DelayedFcnCall
 
+
+class Manager(object):
+  """Object which helps create a delayed computational unit.
+
+  Typically will be set as a global variable X.
+  X.foo will refer to the "foo" column of the DataFrame in which it is later
+  applied. 
+
+  Manager can be used in two ways: 
+  (1) attribute notation: X.foo
+  (2) item notation: X["foo"]
+
+  Attribute notation is preferred but item notation can be used in cases where 
+  column names contain characters on which python will choke, such as spaces, 
+  periods, and so forth.
+  """
+  def __getattr__(self, attr):
+    if attr == "_":
+      return Later(IdentityStep(), self, "_")
+    else:
+      return Later(AttributeStep(attr), self, attr)
+
+  def __getitem__(self, key):
+    if key == "_":
+      return Later(IdentityStep(), self, "_")
+    else:
+      return Later(BracketStep(key), self, key)
+
+  def evaluate(self, previousResult, original):
+    return original
+
+  def __str__(self):
+    return "X"
+
+  def __repr__(self):
+    return str(self)
+
+
+X = Manager()
 
