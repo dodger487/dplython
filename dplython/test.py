@@ -3,6 +3,7 @@
 
 """Testing for python dplyr."""
 
+from collections import Counter
 import math
 import unittest
 import os
@@ -401,6 +402,37 @@ class TestArrange(unittest.TestCase):
                      min((self.diamonds.carat-3)**2))
     self.assertEqual((sortedDf.iloc[-1].carat-3)**2,
                      max((self.diamonds.carat-3)**2))
+
+
+class TestCount(unittest.TestCase):
+  diamonds = load_diamonds()
+
+  def testCount(self):
+    counts_pd = Counter(self.diamonds.cut)
+    counts_dp = self.diamonds >> count(X.cut)
+
+    counts_pd = sorted(list(counts_pd.values()))
+    counts_dp = sorted(list(counts_dp.n))
+
+    self.assertEqual(counts_pd, counts_dp)
+
+  def testCountExpression(self):
+    counts_pd = Counter(self.diamonds.carat // 1)
+    counts_dp = self.diamonds >> count(X.carat // 1)
+
+    counts_pd = sorted(list(counts_pd.values()))
+    counts_dp = sorted(list(counts_dp.n))
+
+    self.assertEqual(counts_pd, counts_dp)
+
+  def testCountMulti(self):
+    counts_pd = Counter(zip(self.diamonds["cut"], self.diamonds["color"]))
+    counts_dp = self.diamonds >> count(X.cut, X.color)
+
+    counts_pd = sorted(list(counts_pd.values()))
+    counts_dp = sorted(list(counts_dp.n))
+
+    self.assertEqual(counts_pd, counts_dp)
 
 
 class TestSample(unittest.TestCase):
