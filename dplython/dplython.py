@@ -293,6 +293,12 @@ def summarize(**kwargs):
   return CreateSummarizedDf
 
 
+def count(*args, **kwargs):
+  def CreateCountDf(df):
+    return df >> group_by(*args, **kwargs) >> summarize(n=X._.__len__())
+  return CreateCountDf
+  
+
 def UngroupDF(df):
   # df._grouped_on = None
   # df._group_dict = None
