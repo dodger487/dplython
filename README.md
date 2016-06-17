@@ -27,6 +27,11 @@ To get the latest development version, you can clone this repo or use the comman
 pip install git+https://github.com/dodger487/dplython.git
 ```
 
+## Contributing
+We welcome your feature requests, open issues, bug reports, and pull requests!
+Please use GitHub's interface.
+Also consider joining the [dplython mailing list](https://groups.google.com/forum/#!forum/dplython).
+
 ## Example usage
 ```python
 import pandas
