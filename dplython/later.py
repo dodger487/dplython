@@ -89,6 +89,10 @@ class Step(object):
     return [(arg.evaluate(df) if isinstance(arg, Later) else arg) 
             for arg in self.args]
 
+  def evaluated_kwargs(self, df):
+    return {k: v.evaluate(df) if isinstance(v, Later) else v
+            for k, v in self.kwargs.items()}
+
 
 class OperatorStep(Step):
 
@@ -101,7 +105,7 @@ class OperatorStep(Step):
   def evaluate(self, previousResult, original):
     return self.operator.apply(previousResult, 
                                *self.evaluated_args(original), 
-                               **self.kwargs)
+                               **self.evaluated_kwargs(original))
 
   def format_operation(self, obj):
     formatted_args = [self.format_exp(arg) for arg in [obj] + list(self.args)]
@@ -132,7 +136,7 @@ class CallStep(ArgStep):
 
   def evaluate(self, previousResult, original):
     return previousResult.__call__(*self.evaluated_args(original), 
-                                   **self.kwargs)
+                                   **self.evaluated_kwargs(original))
 
 
 class FunctionStep(ArgStep):
@@ -147,7 +151,7 @@ class FunctionStep(ArgStep):
 
   def evaluate(self, previousResult, original):
     return self.func(*self.evaluated_args(original), 
-                     **self.kwargs)
+                     **self.evaluated_kwargs(original))
 
 
 class AttributeStep(Step):
@@ -210,6 +214,9 @@ class IdentityStep(Step):
 
   def evaluate(self, previousResult, original):
     return previousResult
+
+  def format_operation(self, obj):
+    return "X._"
 
 
 OPERATORS = {
