@@ -86,6 +86,34 @@ class TestLaterStrMethod(unittest.TestCase):
     self.assertEqual(str(biz), 'X.foo[4] / X.bar[2:3] + X.baz[::2]')
 
 
+class TestDelayFunctions(unittest.TestCase):
+  diamonds = load_diamonds()
+
+  def test_function_args(self):
+    foo_pd = PairwiseGreater(self.diamonds["x"], self.diamonds["y"])
+    foo_dp = self.diamonds >> mutate(foo=PairwiseGreater(X.x, X.y)) >> X._.foo
+    self.assertTrue((foo_pd == foo_dp).all())
+
+  def test_function_kwargs(self):
+    @DelayFunction
+    def PairwiseGreaterKwargs(series1=None, series2=None):
+      index = series1.index
+      newSeries = pd.Series(np.zeros(len(series1)))
+      s1_ind = series1 > series2
+      s2_ind = series1 <= series2
+      newSeries[s1_ind] = series1[s1_ind]
+      newSeries[s2_ind] = series2[s2_ind]
+      newSeries.index = index
+      return newSeries
+
+    foo_pd = PairwiseGreaterKwargs(
+        series1=self.diamonds["x"], series2=self.diamonds["y"])
+    foo_dp = (self.diamonds >>
+                mutate(foo=PairwiseGreaterKwargs(series1=X.x, series2=X.y)) >>
+                X._.foo)
+    self.assertTrue((foo_pd == foo_dp).all())
+
+
 class TestMutates(unittest.TestCase):
   diamonds = load_diamonds()
 
