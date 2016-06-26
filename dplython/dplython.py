@@ -141,7 +141,8 @@ def ApplyToDataframe(fcn):
     if len(args) > 0 and isinstance(args[0], pandas.DataFrame):
       # data_arg = args[0].copy(deep=True)
       data_arg = args[0]
-      args = args[1:]
+      if 'join' not in fcn.__name__:
+        args = args[1:]
     fcn_to_apply = fcn(*args, **kwargs)
     if data_arg is None:
       return fcn_to_apply
@@ -408,3 +409,40 @@ def if_else(bool_series, series_true, series_false):
       in zip(bool_series, series_true, series_false)])
   newSeries.index = index
   return newSeries
+
+def get_join_cols(by_entry):
+  left_cols = []
+  right_cols = []
+  for col in by_entry:
+    if '=' in col:
+      left_cols.append(col.split('=')[0])
+      right_cols.append(col.split('=')[1])
+    else:
+      left_cols.append(col)
+      right_cols.append(col)
+  return left_cols, right_cols
+
+@ApplyToDataframe
+def inner_join(*args, **kwargs):
+  if 'by' in kwargs:
+    left_cols, right_cols = get_join_cols(kwargs['by'])
+  else:
+    left_cols, right_cols = None, None
+  if 'suffixes' in kwargs:
+    dsuffixes = kwargs['suffixes']
+  else:
+    dsuffixes = ('_x', '_y')
+  def f(df):
+    x = lambda df: DplyFrame(df.merge(args[0], how='inner', left_on=left_cols, right_on=right_cols, suffixes=dsuffixes))
+    return x
+  return f
+
+x = df1_d >> inner_join(df2_d, suffixes=('1', '2'))
+x
+df1_d = DplyFrame(df1)
+df2_d = DplyFrame(df2)
+
+df1.merge(df2, how='left',left_on=['B'], right_on=['E'], suffixes=('1', '2'))
+
+df1_d >> inner_join(df2_d, by=['A', 'B'])
+df1_d >> inner_join(df2_d, by=['A=B', 'B'])
