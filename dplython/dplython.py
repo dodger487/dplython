@@ -411,6 +411,9 @@ def if_else(bool_series, series_true, series_false):
   return newSeries
 
 def get_join_cols(by_entry):
+  """ helper function used for joins
+  builds left and right join list for djoin function
+  """
   left_cols = []
   right_cols = []
   for col in by_entry:
@@ -422,24 +425,26 @@ def get_join_cols(by_entry):
       right_cols.append(col)
   return left_cols, right_cols
 
-@ApplyToDataframe
-def inner_join(*args, **kwargs):
-  right = args[0]
-  if 'by' in kwargs:
-    left_cols, right_cols = get_join_cols(kwargs['by'])
-  else:
-    left_cols, right_cols = None, None
-  if 'suffixes' in kwargs:
-    dsuffixes = kwargs['suffixes']
-  else:
-    dsuffixes = ('_x', '_y')
-  def f(df):
-    x = lambda df: DplyFrame(df.merge(right, how='inner', left_on=left_cols, right_on=right_cols, suffixes=dsuffixes))
-    return x
-  return f
+def djoin(right, **kwargs):
+  """ generic function for dplyr-style joins
+  uses dplyr syntax
+  >>> left_data >> inner_join(right_data, by=[join_columns], suffixes=(character_tuple_of_length_2)
+  e.g. flights2 >> left_join(airports, by=['origin=faa']) >> head(5)
 
-def djoin(*args, **kwargs):
-  right = args[0]
+  The by argument takes a list of columns. For a list like ['A', 'B'], it assumes 'A' and 'B' are columns in both
+  dataframes.
+  For a list like ['A=B'], it assumes column 'A' in the left dataframe is the same as column 'B' in the right dataframe.
+  Can mix and match (e.g. by=['A', 'B=C'] will assume both dataframes have column 'A', and column 'B' in the left
+  dataframe is the same as column 'C' in the right dataframe.
+  If by is not specified, then all shared columns will be assumed to be the join columns.
+
+  suffixes will be used to rename columns that are common to both dataframes, but not used in the join operation.
+  e.g. suffixes=('_1', '_2').
+  If suffixes is not included, then the pandas default will be used ('_x', '_y')
+
+  Currently, only the 4 mutating joins are implemented (left, right, inner, outer/full)
+  """
+  # candidate for improvement
   if 'by' in kwargs:
     left_cols, right_cols = get_join_cols(kwargs['by'])
   else:
@@ -454,31 +459,23 @@ def djoin(*args, **kwargs):
   return f
 
 @ApplyToDataframe
-def inner_join(*args, **kwargs):
-  return djoin(*args, how='inner', **kwargs)
+def inner_join(right, **kwargs):
+  return djoin(right, how='inner', **kwargs)
 
 @ApplyToDataframe
-def outer_join(*args, **kwargs):
-  return djoin(*args, how='outer', **kwargs)
+def full_join(right, **kwargs):
+  return djoin(right, how='outer', **kwargs)
 
 @ApplyToDataframe
-def left_join(*args, **kwargs):
-  return djoin(*args, how='left', **kwargs)
+def left_join(right, **kwargs):
+  return djoin(right, how='left', **kwargs)
 
 @ApplyToDataframe
-def right_join(*args, **kwargs):
-  return djoin(*args, how='right', **kwargs)
+def right_join(right, **kwargs):
+  return djoin(right, how='right', **kwargs)
 
 
-df1_d >> inner_join(df2_d, by=['A'], suffixes=('1', '2'))
-df1_d >> outer_join(df2_d, by=['A'], suffixes=('1', '2'))
-df1_d >> left_join(df2_d, by=['A'], suffixes=('1', '2'))
-df1_d >> right_join(df2_d, by=['A'], suffixes=('1', '2'))
-x
-df1_d = DplyFrame(df1)
-df2_d = DplyFrame(df2)
-
-df1.merge(df2, how='left',left_on=['B'], right_on=['E'], suffixes=('1', '2'))
-
-df1_d >> inner_join(df2_d, by=['A', 'B'])
-df1_d >> inner_join(df2_d, by=['A=B', 'B'])
+# df1_d >> inner_join(df2_d, by=['A'], suffixes=('1', '2'))
+# df1_d >> full_join(df2_d, by=['A'], suffixes=('1', '2'))
+# df1_d >> left_join(df2_d, by=['A'], suffixes=('1', '2'))
+# df1_d >> right_join(df2_d, by=['A'], suffixes=('1', '2'))
