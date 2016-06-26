@@ -473,9 +473,3 @@ def left_join(right, **kwargs):
 @ApplyToDataframe
 def right_join(right, **kwargs):
   return djoin(right, how='right', **kwargs)
-
-
-# df1_d >> inner_join(df2_d, by=['A'], suffixes=('1', '2'))
-# df1_d >> full_join(df2_d, by=['A'], suffixes=('1', '2'))
-# df1_d >> left_join(df2_d, by=['A'], suffixes=('1', '2'))
-# df1_d >> right_join(df2_d, by=['A'], suffixes=('1', '2'))
