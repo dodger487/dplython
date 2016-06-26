@@ -424,6 +424,7 @@ def get_join_cols(by_entry):
 
 @ApplyToDataframe
 def inner_join(*args, **kwargs):
+  right = args[0]
   if 'by' in kwargs:
     left_cols, right_cols = get_join_cols(kwargs['by'])
   else:
@@ -433,11 +434,46 @@ def inner_join(*args, **kwargs):
   else:
     dsuffixes = ('_x', '_y')
   def f(df):
-    x = lambda df: DplyFrame(df.merge(args[0], how='inner', left_on=left_cols, right_on=right_cols, suffixes=dsuffixes))
+    x = lambda df: DplyFrame(df.merge(right, how='inner', left_on=left_cols, right_on=right_cols, suffixes=dsuffixes))
     return x
   return f
 
-x = df1_d >> inner_join(df2_d, suffixes=('1', '2'))
+def djoin(*args, **kwargs):
+  right = args[0]
+  if 'by' in kwargs:
+    left_cols, right_cols = get_join_cols(kwargs['by'])
+  else:
+    left_cols, right_cols = None, None
+  if 'suffixes' in kwargs:
+    dsuffixes = kwargs['suffixes']
+  else:
+    dsuffixes = ('_x', '_y')
+  def f(df):
+    x = lambda df: DplyFrame(df.merge(right, how=kwargs['how'], left_on=left_cols, right_on=right_cols, suffixes=dsuffixes))
+    return x
+  return f
+
+@ApplyToDataframe
+def inner_join(*args, **kwargs):
+  return djoin(*args, how='inner', **kwargs)
+
+@ApplyToDataframe
+def outer_join(*args, **kwargs):
+  return djoin(*args, how='outer', **kwargs)
+
+@ApplyToDataframe
+def left_join(*args, **kwargs):
+  return djoin(*args, how='left', **kwargs)
+
+@ApplyToDataframe
+def right_join(*args, **kwargs):
+  return djoin(*args, how='right', **kwargs)
+
+
+df1_d >> inner_join(df2_d, by=['A'], suffixes=('1', '2'))
+df1_d >> outer_join(df2_d, by=['A'], suffixes=('1', '2'))
+df1_d >> left_join(df2_d, by=['A'], suffixes=('1', '2'))
+df1_d >> right_join(df2_d, by=['A'], suffixes=('1', '2'))
 x
 df1_d = DplyFrame(df1)
 df2_d = DplyFrame(df2)
