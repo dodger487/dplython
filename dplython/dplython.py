@@ -417,24 +417,24 @@ def get_join_cols(by_entry):
   left_cols = []
   right_cols = []
   for col in by_entry:
-    if '=' in col:
-      left_cols.append(col.split('=')[0])
-      right_cols.append(col.split('=')[1])
-    else:
+    if len(col) == 1:
       left_cols.append(col)
       right_cols.append(col)
+    else:
+      left_cols.append(col[0])
+      right_cols.append(col[1])
   return left_cols, right_cols
 
 def djoin(right, **kwargs):
   """ generic function for dplyr-style joins
   uses dplyr syntax
-  >>> left_data >> inner_join(right_data, by=[join_columns], suffixes=(character_tuple_of_length_2)
-  e.g. flights2 >> left_join(airports, by=['origin=faa']) >> head(5)
+  >>> left_data >> inner_join(right_data, by=[join_columns_in_list_as_single_or_tuple], suffixes=(character_tuple_of_length_2)
+  e.g. flights2 >> left_join(airports, by=[('origin', 'faa')]) >> head(5)
 
   The by argument takes a list of columns. For a list like ['A', 'B'], it assumes 'A' and 'B' are columns in both
   dataframes.
-  For a list like ['A=B'], it assumes column 'A' in the left dataframe is the same as column 'B' in the right dataframe.
-  Can mix and match (e.g. by=['A', 'B=C'] will assume both dataframes have column 'A', and column 'B' in the left
+  For a list like [('A', 'B')], it assumes column 'A' in the left dataframe is the same as column 'B' in the right dataframe.
+  Can mix and match (e.g. by=['A', ('B', 'C')] will assume both dataframes have column 'A', and column 'B' in the left
   dataframe is the same as column 'C' in the right dataframe.
   If by is not specified, then all shared columns will be assumed to be the join columns.
 
