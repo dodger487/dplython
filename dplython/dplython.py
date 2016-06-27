@@ -141,7 +141,8 @@ def ApplyToDataframe(fcn):
     if len(args) > 0 and isinstance(args[0], pandas.DataFrame):
       # data_arg = args[0].copy(deep=True)
       data_arg = args[0]
-      args = args[1:]
+      if 'join' not in fcn.__name__:
+        args = args[1:]
     fcn_to_apply = fcn(*args, **kwargs)
     if data_arg is None:
       return fcn_to_apply
@@ -408,3 +409,67 @@ def if_else(bool_series, series_true, series_false):
       in zip(bool_series, series_true, series_false)])
   newSeries.index = index
   return newSeries
+
+def get_join_cols(by_entry):
+  """ helper function used for joins
+  builds left and right join list for djoin function
+  """
+  left_cols = []
+  right_cols = []
+  for col in by_entry:
+    if len(col) == 1:
+      left_cols.append(col)
+      right_cols.append(col)
+    else:
+      left_cols.append(col[0])
+      right_cols.append(col[1])
+  return left_cols, right_cols
+
+def djoin(right, **kwargs):
+  """ generic function for dplyr-style joins
+  uses dplyr syntax
+  >>> left_data >> inner_join(right_data, by=[join_columns_in_list_as_single_or_tuple], suffixes=(character_tuple_of_length_2)
+  e.g. flights2 >> left_join(airports, by=[('origin', 'faa')]) >> head(5)
+
+  The by argument takes a list of columns. For a list like ['A', 'B'], it assumes 'A' and 'B' are columns in both
+  dataframes.
+  For a list like [('A', 'B')], it assumes column 'A' in the left dataframe is the same as column 'B' in the right dataframe.
+  Can mix and match (e.g. by=['A', ('B', 'C')] will assume both dataframes have column 'A', and column 'B' in the left
+  dataframe is the same as column 'C' in the right dataframe.
+  If by is not specified, then all shared columns will be assumed to be the join columns.
+
+  suffixes will be used to rename columns that are common to both dataframes, but not used in the join operation.
+  e.g. suffixes=('_1', '_2').
+  If suffixes is not included, then the pandas default will be used ('_x', '_y')
+
+  Currently, only the 4 mutating joins are implemented (left, right, inner, outer/full)
+  """
+  # candidate for improvement
+  if 'by' in kwargs:
+    left_cols, right_cols = get_join_cols(kwargs['by'])
+  else:
+    left_cols, right_cols = None, None
+  if 'suffixes' in kwargs:
+    dsuffixes = kwargs['suffixes']
+  else:
+    dsuffixes = ('_x', '_y')
+  def f(df):
+    x = lambda df: DplyFrame(df.merge(right, how=kwargs['how'], left_on=left_cols, right_on=right_cols, suffixes=dsuffixes))
+    return x
+  return f
+
+@ApplyToDataframe
+def inner_join(right, **kwargs):
+  return djoin(right, how='inner', **kwargs)
+
+@ApplyToDataframe
+def full_join(right, **kwargs):
+  return djoin(right, how='outer', **kwargs)
+
+@ApplyToDataframe
+def left_join(right, **kwargs):
+  return djoin(right, how='left', **kwargs)
+
+@ApplyToDataframe
+def right_join(right, **kwargs):
+  return djoin(right, how='right', **kwargs)
