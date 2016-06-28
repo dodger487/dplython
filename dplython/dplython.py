@@ -417,7 +417,7 @@ def get_join_cols(by_entry):
   left_cols = []
   right_cols = []
   for col in by_entry:
-    if len(col) == 1:
+    if isinstance(col, str):
       left_cols.append(col)
       right_cols.append(col)
     else:
