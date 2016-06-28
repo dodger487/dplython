@@ -425,8 +425,8 @@ def get_join_cols(by_entry):
       right_cols.append(col[1])
   return left_cols, right_cols
 
-def djoin(right, **kwargs):
-  """ generic function for dplyr-style joins
+def mutating_join(right, **kwargs):
+  """ generic function for mutating dplyr-style joins
   uses dplyr syntax
   >>> left_data >> inner_join(right_data, by=[join_columns_in_list_as_single_or_tuple], suffixes=(character_tuple_of_length_2)
   e.g. flights2 >> left_join(airports, by=[('origin', 'faa')]) >> head(5)
@@ -460,16 +460,16 @@ def djoin(right, **kwargs):
 
 @ApplyToDataframe
 def inner_join(right, **kwargs):
-  return djoin(right, how='inner', **kwargs)
+  return mutating_join(right, how='inner', **kwargs)
 
 @ApplyToDataframe
 def full_join(right, **kwargs):
-  return djoin(right, how='outer', **kwargs)
+  return mutating_join(right, how='outer', **kwargs)
 
 @ApplyToDataframe
 def left_join(right, **kwargs):
-  return djoin(right, how='left', **kwargs)
+  return mutating_join(right, how='left', **kwargs)
 
 @ApplyToDataframe
 def right_join(right, **kwargs):
-  return djoin(right, how='right', **kwargs)
+  return mutating_join(right, how='right', **kwargs)
