@@ -97,14 +97,14 @@ class DplyFrame(DataFrame):
       otherDf = DplyFrame(self.copy(deep=True))
       return delayedFcn(otherDf)
 
-    # if isinstance(delayedFcn, mutate):
-    #   otherDf = DplyFrame(self.copy(deep=True))
-    #   return delayedFcn(otherDf)
+    if isinstance(delayedFcn, mutate):
+      otherDf = DplyFrame(self.copy(deep=True))
+      return delayedFcn(otherDf)
 
-    # if self._grouped_self:
-    #   outDf = self.apply_on_groups(delayedFcn)
-    #   return outDf
-    # else:
+    if self._grouped_self:
+      outDf = self.apply_on_groups(delayedFcn)
+      return outDf
+    else:
     otherDf = DplyFrame(self.copy(deep=True))
     return delayedFcn(otherDf)
 
@@ -203,6 +203,17 @@ def _dict_to_possibly_ordered_tuples(dict_):
 
 class Verb(object):
 
+  def __new__(cls, *args, **kwargs):
+    if len(args) > 0 and isinstance(args[0], pandas.DataFrame):
+      verb = cls(*args[1:], **kwargs)
+      return verb(args[0].copy(deep=True))
+    else:
+      return super(Verb, cls).__new__(cls)
+
+  def __init__(self, *args, **kwargs):
+    self.args = args
+    self.kwargs = kwargs
+
   def do(self):
     raise NotImplementedError()
 
@@ -210,17 +221,6 @@ class Verb(object):
 class mutate(Verb):
 
   __name__ = "mutate"
-
-  def __new__(cls, *args, **kwargs):
-    if len(args) > 0 and isinstance(args[0], pandas.DataFrame):
-      m = mutate(*args[1:], **kwargs)
-      return m(args[0].copy(deep=True))
-    else:
-      return super(mutate, cls).__new__(cls)
-
-  def __init__(self, *args, **kwargs):
-    self.args = args
-    self.kwargs = kwargs
 
   def __call__(self, df):
     for arg in self.args:
