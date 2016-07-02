@@ -42,7 +42,7 @@ class Operator(object):
     return func(*args)
 
   def format_exp(self, exp):
-    if type(exp) == Later and exp._step.precedence < self.precedence:
+    if isinstance(exp, Later) and exp._step.precedence < self.precedence:
       return "({0})".format(str(exp))
     else:
       return str(exp)
@@ -80,7 +80,7 @@ class Step(object):
     raise NotImplementedError
 
   def format_exp(self, exp):
-    if type(exp) == Later and exp._step.precedence < self.precedence:
+    if isinstance(exp, Later) and exp._step.precedence < self.precedence:
       return "({0})".format(str(exp))
     else:
       return str(exp)
@@ -210,6 +210,7 @@ class SliceStep(BracketStep):
 class IdentityStep(Step):
 
   def __init__(self):
+    # self._queue = []
     super(IdentityStep, self).__init__(17)
 
   def evaluate(self, previousResult, original):
@@ -304,14 +305,21 @@ class Later(object):
   """
 
   def __init__(self, step, previous, name = None):
+    if isinstance(step, IdentityStep) or name is not None:
+      self._queue = []
+    else:
+      self._queue = previous._queue
     self._step = step
+    self._queue.append(step)
     self._previous = previous
     self._name = name
 
   def evaluate(self, previousResult, original=None):
     original = original if original is not None else previousResult
-    previousResult = self._previous.evaluate(previousResult, original)
-    return self._step.evaluate(previousResult, original)
+    currentResult = previousResult
+    for step in self._queue:
+      currentResult = step.evaluate(currentResult, original=original)
+    return currentResult
     
   def __str__(self):
     return self._step.format_operation(self._previous)
@@ -332,15 +340,9 @@ class Later(object):
     otherDf = DplyFrame(df.copy(deep=True))
     return self.evaluate(otherDf)
 
-  # def _UpdateStrAttr(self, attr):
-  #   self._op = OPERATORS.get(attr, AttributeOperator(attr))
-
-  # def _UpdateStrCallArgs(self, args, kwargs):
-  #   self._str = self._op.format_operation(self, args, kwargs)
-  #   self._precedence = self._op.precedence
 
 def CreateLaterFunction(fcn, *args, **kwargs):
-  return Later(FunctionStep(fcn, *args, **kwargs), IdentityStep())
+  return Later(FunctionStep(fcn, *args, **kwargs), IdentityStep(), "function")
 
 def DelayFunction(fcn):
   def DelayedFcnCall(*args, **kwargs):
