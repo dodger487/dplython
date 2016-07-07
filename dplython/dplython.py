@@ -73,6 +73,9 @@ class DplyFrame(DataFrame):
     self._grouped_self = None
 
   def apply_on_groups(self, delayedFcn):
+    if isinstance(delayedFcn, mutate):
+      return delayedFcn(self)
+
     outDf = self._grouped_self.apply(delayedFcn)
 
     # Remove multi-index created from grouping and applying
@@ -239,13 +242,13 @@ class mutate(Verb):
   def __call__(self, df):
     for arg in self.args:
       if isinstance(arg, Later):
-        df[str(arg)] = arg.evaluate(df)
+        df[str(arg)] = arg.evaluate(df, fast=True)
       else:
         df[str(arg)] = arg
 
     for key, val in _dict_to_possibly_ordered_tuples(self.kwargs):
       if isinstance(val, Later):
-        df[key] = val.evaluate(df)
+        df[key] = val.evaluate(df, fast=True)
       else:
         df[key] = val
     return df

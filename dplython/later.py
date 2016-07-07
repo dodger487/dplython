@@ -1,4 +1,7 @@
+from six.moves import reduce
+
 import operator
+
 
 # reversible_operators = [
 #     ["__add__", "__radd__"],
@@ -53,12 +56,22 @@ class Operator(object):
 
 class BinaryOperator(Operator):
 
+  def apply(self, *args, **kwargs):
+    func = getattr(operator, self.name)
+    return func(*args)
+
   def get_format_string(self, symbol):
     return "{0} " + symbol + " {1}"
 
 
 class ReverseBinaryOperator(Operator):
   
+  def apply(self, *args, **kwargs):
+    """"""
+    """Note: this is a binary operator, so we know there are only two args."""
+    func = getattr(operator, self.name)
+    return func(args[1], args[0])
+
   def get_format_string(self, symbol):
     return "{1} " + symbol + " {0}"
 
@@ -85,12 +98,12 @@ class Step(object):
     else:
       return str(exp)
 
-  def evaluated_args(self, df):
-    return [(arg.evaluate(df) if isinstance(arg, Later) else arg) 
+  def evaluated_args(self, df, **kwargs):
+    return [(arg.evaluate(df, **kwargs) if isinstance(arg, Later) else arg)
             for arg in self.args]
 
-  def evaluated_kwargs(self, df):
-    return {k: v.evaluate(df) if isinstance(v, Later) else v
+  def evaluated_kwargs(self, df, **kwargs):
+    return {k: v.evaluate(df, **kwargs) if isinstance(v, Later) else v
             for k, v in self.kwargs.items()}
 
 
@@ -102,10 +115,10 @@ class OperatorStep(Step):
                                        *args, 
                                        **kwargs)
 
-  def evaluate(self, previousResult, original):
+  def evaluate(self, previousResult, original, **kwargs):
     return self.operator.apply(previousResult, 
-                               *self.evaluated_args(original), 
-                               **self.evaluated_kwargs(original))
+                               *self.evaluated_args(original, **kwargs),
+                               **self.evaluated_kwargs(original, **kwargs))
 
   def format_operation(self, obj):
     formatted_args = [self.format_exp(arg) for arg in [obj] + list(self.args)]
@@ -134,9 +147,9 @@ class CallStep(ArgStep):
     return "{0}({1})".format(obj,
                              self.format_args())
 
-  def evaluate(self, previousResult, original):
-    return previousResult.__call__(*self.evaluated_args(original), 
-                                   **self.evaluated_kwargs(original))
+  def evaluate(self, previousResult, original, **kwargs):
+    return previousResult.__call__(*self.evaluated_args(original, **kwargs),
+                                   **self.evaluated_kwargs(original, **kwargs))
 
 
 class FunctionStep(ArgStep):
@@ -149,9 +162,9 @@ class FunctionStep(ArgStep):
     return "{0}({1})".format(self.func.__name__,
                              self.format_args())
 
-  def evaluate(self, previousResult, original):
-    return self.func(*self.evaluated_args(original), 
-                     **self.evaluated_kwargs(original))
+  def evaluate(self, previousResult, original, **kwargs):
+    return self.func(*self.evaluated_args(original, **kwargs),
+                     **self.evaluated_kwargs(original, **kwargs))
 
 
 class AttributeStep(Step):
@@ -164,7 +177,7 @@ class AttributeStep(Step):
     return "{0}.{1}".format(self.format_exp(obj),
                             self.attr)
 
-  def evaluate(self, previousResult, original):
+  def evaluate(self, previousResult, original, **kwargs):
     return getattr(previousResult, self.attr)
 
 
@@ -195,7 +208,7 @@ class BracketStep(Step):
     else:
       return str(self.key)
 
-  def evaluate(self, previousResult, original):
+  def evaluate(self, previousResult, original, **kwargs):
     return operator.getitem(previousResult, self.key)
 
 
@@ -210,10 +223,9 @@ class SliceStep(BracketStep):
 class IdentityStep(Step):
 
   def __init__(self):
-    # self._queue = []
     super(IdentityStep, self).__init__(17)
 
-  def evaluate(self, previousResult, original):
+  def evaluate(self, previousResult, original, **kwargs):
     return previousResult
 
   def format_operation(self, obj):
@@ -314,12 +326,39 @@ class Later(object):
     self._previous = previous
     self._name = name
 
-  def evaluate(self, previousResult, original=None):
+  def evaluate(self, previousResult, original=None, fast=False):
     original = original if original is not None else previousResult
-    currentResult = previousResult
-    for step in self._queue:
-      currentResult = step.evaluate(currentResult, original=original)
-    return currentResult
+
+    if original._grouped_self and fast:
+      name = GetName(self)
+
+      # TODO: Rewrite this, this is terrible.
+      go_to_index = len(self._queue)
+      for idx, item in enumerate(self._queue):
+        if isinstance(item, OperatorStep):
+          go_to_index = idx
+          break
+
+      transform_input = lambda x: reduce(
+          lambda prevResult, f: f.evaluate(prevResult, original, fast=fast),
+          self._queue[1:go_to_index],
+          x
+      )
+      out = original._grouped_self[name].transform(transform_input)
+      out = reduce(lambda prevResult, f: f.evaluate(prevResult, original, fast=fast),
+                      self._queue[go_to_index:],
+                      out)
+      return out
+    else:
+      output = reduce(lambda prevResult, f: f.evaluate(prevResult, original),
+                      self._queue,
+                      original)
+      return output
+
+    # currentResult = previousResult
+    # for step in self._queue:
+    #   currentResult = step.evaluate(currentResult, original=original)
+    # return currentResult
     
   def __str__(self):
     return self._step.format_operation(self._previous)
@@ -356,6 +395,12 @@ def DelayFunction(fcn):
   return DelayedFcnCall
 
 
+def GetName(later):
+  while not later._name:
+    later = later._previous
+  return later._name
+
+
 class Manager(object):
   """Object which helps create a delayed computational unit.
 
@@ -383,7 +428,7 @@ class Manager(object):
     else:
       return Later(BracketStep(key), self, key)
 
-  def evaluate(self, previousResult, original):
+  def evaluate(self, previousResult, original, **kwargs):
     return original
 
   def __str__(self):
