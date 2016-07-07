@@ -294,6 +294,7 @@ def summarize(**kwargs):
   return CreateSummarizedDf
 
 
+@ApplyToDataframe
 def count(*args, **kwargs):
   def CreateCountDf(df):
     return (df >> group_by(*args, **kwargs) >>
