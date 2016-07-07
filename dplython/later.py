@@ -53,12 +53,22 @@ class Operator(object):
 
 class BinaryOperator(Operator):
 
+  def apply(self, *args, **kwargs):
+    func = getattr(operator, self.name)
+    return func(*args)
+
   def get_format_string(self, symbol):
     return "{0} " + symbol + " {1}"
 
 
 class ReverseBinaryOperator(Operator):
   
+  def apply(self, *args, **kwargs):
+    # Note: this is a binary operator, so we know there are only two args.
+    # This is the reverse, so we have to flip them.
+    func = getattr(operator, self.name)
+    return func(args[1], args[0])
+
   def get_format_string(self, symbol):
     return "{1} " + symbol + " {0}"
 
