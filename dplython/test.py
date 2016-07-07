@@ -9,6 +9,7 @@ import unittest
 import os
 
 import numpy as np
+import numpy.testing as npt
 import pandas as pd
 
 from dplython import *
@@ -403,6 +404,15 @@ class TestGroupBy(unittest.TestCase):
     )
     for row in diamonds_grouped.itertuples():
       self.assertEqual(row.total_price, diamonds_pd[row.label])
+
+  def testGroupByMutate(self):
+    df = self.diamonds >> mutate(bin=X["Unnamed: 0"] % 5000)
+    gbinp = df.groupby("bin")
+    df["foo2"] = (df >> group_by(X.bin) >> mutate(foo=X.x.mean() + X.y.mean()))["foo"]
+    df["foo1"] = gbinp.x.transform('mean') + gbinp.y.transform('mean')
+    npt.assert_allclose(df.foo1, df.foo2)
+    # self.assertAlmostEqual(df.foo1, df.foo2)
+
 
 class TestArrange(unittest.TestCase):
   diamonds = load_diamonds()

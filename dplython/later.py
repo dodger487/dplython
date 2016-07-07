@@ -1,4 +1,7 @@
+from six.moves import reduce
+
 import operator
+
 
 # reversible_operators = [
 #     ["__add__", "__radd__"],
@@ -42,7 +45,7 @@ class Operator(object):
     return func(*args)
 
   def format_exp(self, exp):
-    if type(exp) == Later and exp._step.precedence < self.precedence:
+    if isinstance(exp, Later) and exp._step.precedence < self.precedence:
       return "({0})".format(str(exp))
     else:
       return str(exp)
@@ -90,17 +93,17 @@ class Step(object):
     raise NotImplementedError
 
   def format_exp(self, exp):
-    if type(exp) == Later and exp._step.precedence < self.precedence:
+    if isinstance(exp, Later) and exp._step.precedence < self.precedence:
       return "({0})".format(str(exp))
     else:
       return str(exp)
 
-  def evaluated_args(self, df):
-    return [(arg.evaluate(df) if isinstance(arg, Later) else arg) 
+  def evaluated_args(self, df, **kwargs):
+    return [(arg.evaluate(df, **kwargs) if isinstance(arg, Later) else arg)
             for arg in self.args]
 
-  def evaluated_kwargs(self, df):
-    return {k: v.evaluate(df) if isinstance(v, Later) else v
+  def evaluated_kwargs(self, df, **kwargs):
+    return {k: v.evaluate(df, **kwargs) if isinstance(v, Later) else v
             for k, v in self.kwargs.items()}
 
 
@@ -112,10 +115,10 @@ class OperatorStep(Step):
                                        *args, 
                                        **kwargs)
 
-  def evaluate(self, previousResult, original):
+  def evaluate(self, previousResult, original, **kwargs):
     return self.operator.apply(previousResult, 
-                               *self.evaluated_args(original), 
-                               **self.evaluated_kwargs(original))
+                               *self.evaluated_args(original, **kwargs),
+                               **self.evaluated_kwargs(original, **kwargs))
 
   def format_operation(self, obj):
     formatted_args = [self.format_exp(arg) for arg in [obj] + list(self.args)]
@@ -144,9 +147,9 @@ class CallStep(ArgStep):
     return "{0}({1})".format(obj,
                              self.format_args())
 
-  def evaluate(self, previousResult, original):
-    return previousResult.__call__(*self.evaluated_args(original), 
-                                   **self.evaluated_kwargs(original))
+  def evaluate(self, previousResult, original, **kwargs):
+    return previousResult.__call__(*self.evaluated_args(original, **kwargs),
+                                   **self.evaluated_kwargs(original, **kwargs))
 
 
 class FunctionStep(ArgStep):
@@ -159,9 +162,9 @@ class FunctionStep(ArgStep):
     return "{0}({1})".format(self.func.__name__,
                              self.format_args())
 
-  def evaluate(self, previousResult, original):
-    return self.func(*self.evaluated_args(original), 
-                     **self.evaluated_kwargs(original))
+  def evaluate(self, previousResult, original, **kwargs):
+    return self.func(*self.evaluated_args(original, **kwargs),
+                     **self.evaluated_kwargs(original, **kwargs))
 
 
 class AttributeStep(Step):
@@ -174,7 +177,7 @@ class AttributeStep(Step):
     return "{0}.{1}".format(self.format_exp(obj),
                             self.attr)
 
-  def evaluate(self, previousResult, original):
+  def evaluate(self, previousResult, original, **kwargs):
     return getattr(previousResult, self.attr)
 
 
@@ -205,7 +208,7 @@ class BracketStep(Step):
     else:
       return str(self.key)
 
-  def evaluate(self, previousResult, original):
+  def evaluate(self, previousResult, original, **kwargs):
     return operator.getitem(previousResult, self.key)
 
 
@@ -222,7 +225,7 @@ class IdentityStep(Step):
   def __init__(self):
     super(IdentityStep, self).__init__(17)
 
-  def evaluate(self, previousResult, original):
+  def evaluate(self, previousResult, original, **kwargs):
     return previousResult
 
   def format_operation(self, obj):
@@ -314,14 +317,48 @@ class Later(object):
   """
 
   def __init__(self, step, previous, name = None):
+    if isinstance(step, IdentityStep) or name is not None:
+      self._queue = []
+    else:
+      self._queue = previous._queue
     self._step = step
+    self._queue.append(step)
     self._previous = previous
     self._name = name
 
-  def evaluate(self, previousResult, original=None):
+  def evaluate(self, previousResult, original=None, fast=False):
     original = original if original is not None else previousResult
-    previousResult = self._previous.evaluate(previousResult, original)
-    return self._step.evaluate(previousResult, original)
+
+    if original._grouped_self and fast:
+      name = GetName(self)
+
+      # TODO: Rewrite this, this is terrible.
+      go_to_index = len(self._queue)
+      for idx, item in enumerate(self._queue):
+        if isinstance(item, OperatorStep):
+          go_to_index = idx
+          break
+
+      transform_input = lambda x: reduce(
+          lambda prevResult, f: f.evaluate(prevResult, original, fast=fast),
+          self._queue[1:go_to_index],
+          x
+      )
+      out = original._grouped_self[name].transform(transform_input)
+      out = reduce(lambda prevResult, f: f.evaluate(prevResult, original, fast=fast),
+                      self._queue[go_to_index:],
+                      out)
+      return out
+    else:
+      output = reduce(lambda prevResult, f: f.evaluate(prevResult, original),
+                      self._queue,
+                      original)
+      return output
+
+    # currentResult = previousResult
+    # for step in self._queue:
+    #   currentResult = step.evaluate(currentResult, original=original)
+    # return currentResult
     
   def __str__(self):
     return self._step.format_operation(self._previous)
@@ -342,15 +379,9 @@ class Later(object):
     otherDf = DplyFrame(df.copy(deep=True))
     return self.evaluate(otherDf)
 
-  # def _UpdateStrAttr(self, attr):
-  #   self._op = OPERATORS.get(attr, AttributeOperator(attr))
-
-  # def _UpdateStrCallArgs(self, args, kwargs):
-  #   self._str = self._op.format_operation(self, args, kwargs)
-  #   self._precedence = self._op.precedence
 
 def CreateLaterFunction(fcn, *args, **kwargs):
-  return Later(FunctionStep(fcn, *args, **kwargs), IdentityStep())
+  return Later(FunctionStep(fcn, *args, **kwargs), IdentityStep(), "function")
 
 def DelayFunction(fcn):
   def DelayedFcnCall(*args, **kwargs):
@@ -362,6 +393,12 @@ def DelayFunction(fcn):
       return CreateLaterFunction(fcn, *args, **kwargs)
 
   return DelayedFcnCall
+
+
+def GetName(later):
+  while not later._name:
+    later = later._previous
+  return later._name
 
 
 class Manager(object):
@@ -391,7 +428,7 @@ class Manager(object):
     else:
       return Later(BracketStep(key), self, key)
 
-  def evaluate(self, previousResult, original):
+  def evaluate(self, previousResult, original, **kwargs):
     return original
 
   def __str__(self):
