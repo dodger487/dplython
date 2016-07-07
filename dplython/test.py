@@ -179,7 +179,10 @@ class TestMutates(unittest.TestCase):
     self.assertTrue(diamonds_pd.equals(diamonds_dp))    
 
   def testReverseThings(self):
-    self.diamonds >> mutate(foo=1 - X.carat, bar=7 // X.x, baz=4 % X.y.round())
+    dp = self.diamonds >> mutate(one_minus_carat=1 - X.carat, 
+                                 carat_minus_one=X.carat-1)
+    self.assertTrue(dp.one_minus_carat.equals(1 - self.diamonds.carat))
+    self.assertTrue(dp.carat_minus_one.equals(self.diamonds.carat - 1))
 
   def testMethodFirst(self):
     diamonds_dp = self.diamonds >> mutate(avgDiff=X.x.mean() - X.x)
