@@ -97,16 +97,12 @@ class DplyFrame(DataFrame):
       otherDf = DplyFrame(self.copy(deep=True))
       return delayedFcn(otherDf)
 
-    if isinstance(delayedFcn, mutate):
-      otherDf = DplyFrame(self.copy(deep=True))
-      return delayedFcn(otherDf)
-
     if self._grouped_self:
       outDf = self.apply_on_groups(delayedFcn)
       return outDf
     else:
-    otherDf = DplyFrame(self.copy(deep=True))
-    return delayedFcn(otherDf)
+      otherDf = DplyFrame(self.copy(deep=True))
+      return delayedFcn(otherDf)
 
 
 def ApplyToDataframe(fcn):
@@ -219,6 +215,24 @@ class Verb(object):
 
 
 class mutate(Verb):
+  """Adds a column to the DataFrame.
+
+  This can use existing columns of the DataFrame as input.
+
+  >>> (diamonds >>
+          mutate(carat_bin=X.carat.round()) >>
+          group_by(X.cut, X.carat_bin) >>
+          summarize(avg_price=X.price.mean()))
+  Out:
+         avg_price  carat_bin        cut
+  0     863.908535          0      Ideal
+  1    4213.864948          1      Ideal
+  2   12838.984078          2      Ideal
+  ...
+  27  13466.823529          3       Fair
+  28  15842.666667          4       Fair
+  29  18018.000000          5       Fair
+  """
 
   __name__ = "mutate"
 
@@ -230,7 +244,7 @@ class mutate(Verb):
         df[str(arg)] = arg
 
     for key, val in _dict_to_possibly_ordered_tuples(self.kwargs):
-      if type(val) == Later:
+      if isinstance(val, Later):
         df[key] = val.evaluate(df)
       else:
         df[key] = val
@@ -238,41 +252,6 @@ class mutate(Verb):
 
   def __rrshift__(self, other):
     return self.__call__(DplyFrame(other.copy(deep=True)))
-
-# @ApplyToDataframe
-# def mutate(*args, **kwargs):
-#   """Adds a column to the DataFrame.
-
-#   This can use existing columns of the DataFrame as input.
-
-#   >>> (diamonds >> 
-#           mutate(carat_bin=X.carat.round()) >> 
-#           group_by(X.cut, X.carat_bin) >> 
-#           summarize(avg_price=X.price.mean()))
-#   Out:
-#          avg_price  carat_bin        cut
-#   0     863.908535          0      Ideal
-#   1    4213.864948          1      Ideal
-#   2   12838.984078          2      Ideal
-#   ...
-#   27  13466.823529          3       Fair
-#   28  15842.666667          4       Fair
-#   29  18018.000000          5       Fair
-#   """
-#   def addColumns(df):
-#     for arg in args:
-#       if isinstance(arg, Later):
-#         df[str(arg)] = arg.applyFcns(df)
-#       else:
-#         df[str(arg)] = arg
-
-#     for key, val in _dict_to_possibly_ordered_tuples(kwargs):
-#       if type(val) == Later:
-#         df[key] = val.applyFcns(df)
-#       else:
-#         df[key] = val
-#     return df
-#   return addColumns
 
 
 @ApplyToDataframe
