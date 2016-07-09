@@ -73,7 +73,7 @@ class DplyFrame(DataFrame):
     self._grouped_self = None
 
   def apply_on_groups(self, delayedFcn):
-    if isinstance(delayedFcn, mutate):
+    if isinstance(delayedFcn, mutate) or isinstance(delayedFcn, sift):
       return delayedFcn(self)
 
     outDf = self._grouped_self.apply(delayedFcn)
@@ -125,8 +125,26 @@ def ApplyToDataframe(fcn):
   return DplyrFcn
 
 
-@ApplyToDataframe
-def sift(*args):
+class Verb(object):
+
+  def __new__(cls, *args, **kwargs):
+    if len(args) > 0 and isinstance(args[0], pandas.DataFrame):
+      verb = cls(*args[1:], **kwargs)
+      return verb(args[0].copy(deep=True))
+    else:
+      return super(Verb, cls).__new__(cls)
+
+  def __init__(self, *args, **kwargs):
+    self.args = args
+    self.kwargs = kwargs
+
+  def do(self):
+    raise NotImplementedError()
+
+
+# @ApplyToDataframe
+class sift(Verb):
+# def sift(*args):
   """Filters rows of the data that meet input criteria.
 
   Giving multiple arguments to sift is equivalent to a logical "and".
@@ -144,17 +162,29 @@ def sift(*args):
   #        0.23  Ideal     E     SI2   61.5     
   #        0.23  Ideal     J     VS1   62.8     
   """
-  def f(df):
+
+  __name__ = "sift"
+
+  # def f(df):
+  def __call__(self, df):
     # TODO: This function is a candidate for improvement!
     final_filter = pandas.Series([True for t in range(len(df))])
     final_filter.index = df.index
-    for arg in args:
-      stmt = arg.evaluate(df)
+    grouped = True if df._grouped_on else False
+    for arg in self.args:
+      stmt = arg.evaluate(df, fast=grouped)
       final_filter = final_filter & stmt
     if final_filter.dtype != bool:
       raise Exception("Inputs to filter must be boolean")
-    return df[final_filter]
-  return f
+    df = df[final_filter]
+    if grouped:
+      df.group_self(df._grouped_on)
+    return df
+
+  def __rrshift__(self, other):
+    # return self.__call__(DplyFrame(other.copy(deep=True)))
+    return self.__call__(other)
+
 
 
 def dfilter(*args, **kwargs):
@@ -198,23 +228,6 @@ def _dict_to_possibly_ordered_tuples(dict_):
     return [(key, dict_[key]) for key in order]
   else:
     return sorted(dict_.items(), key=lambda e: e[0])
-
-
-class Verb(object):
-
-  def __new__(cls, *args, **kwargs):
-    if len(args) > 0 and isinstance(args[0], pandas.DataFrame):
-      verb = cls(*args[1:], **kwargs)
-      return verb(args[0].copy(deep=True))
-    else:
-      return super(Verb, cls).__new__(cls)
-
-  def __init__(self, *args, **kwargs):
-    self.args = args
-    self.kwargs = kwargs
-
-  def do(self):
-    raise NotImplementedError()
 
 
 class mutate(Verb):
