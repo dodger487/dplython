@@ -543,6 +543,12 @@ class TestSummarize(unittest.TestCase):
     for i, j in zip(val_pd, valX_dp):
       self.assertEqual(round(i), round(j))
 
+  def testSummarizeGrouping(self):
+    a = DplyFrame(pd.DataFrame({'x': [1, 1, 2, 3]
+                                , 'y': range(1, 5)}))
+    a_summarized = a >> group_by(X.x) >> summarize(mean_y = X.y.mean())
+    self.assertIsNone(a_summarized._grouped_on)
+
 
 class TestAlternateAttrGrab(unittest.TestCase):
   diamonds = load_diamonds()

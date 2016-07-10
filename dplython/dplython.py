@@ -88,7 +88,8 @@ class DplyFrame(DataFrame):
     # Drop all 0 index, created by summarize
     if (outDf.index == 0).all():
       outDf.reset_index(drop=True, inplace=True)
-
+    if 'summarize' in str(delayedFcn):
+      return outDf >> ungroup()
     outDf.group_self(self._grouped_on)
     return outDf
 
