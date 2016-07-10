@@ -257,7 +257,7 @@ class TestSelects(unittest.TestCase):
     diamonds_grouped_2 = diamonds_pd >> group_by(X.cut, X.clarity) >> select(X.x, X.clarity)
     diamonds_selected_2 = diamonds_pd >> select(X.cut, X.x, X.clarity)
     self.assertTrue(diamonds_grouped_1.equals(diamonds_selected_1))
-    self.assertTrue(diamonds_grouped_2.equals(diamonds_selected_2)))
+    self.assertTrue(diamonds_grouped_2.equals(diamonds_selected_2))
 
 class TestFilters(unittest.TestCase):
   diamonds = load_diamonds()
