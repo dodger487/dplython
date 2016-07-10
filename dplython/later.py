@@ -329,7 +329,7 @@ class Later(object):
   def evaluate(self, previousResult, original=None, fast=False):
     original = original if original is not None else previousResult
 
-    if original._grouped_self and fast:
+    if original._grouped_self and fast and not isinstance(self._queue[0], FunctionStep):
       name = GetName(self)
 
       # TODO: Rewrite this, this is terrible.
