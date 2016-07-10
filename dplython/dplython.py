@@ -202,8 +202,22 @@ def select(*args):
   0     E   0.23
   1     E   0.21
   2     E   0.23
+    Grouping variables are implied in selection.
+  >>> df >> group_by(X.a, X.b) >> select(X.c)
+  returns a dataframe like df[[X.a, X.b, X.c]]
+  with the variables appearing in grouped order before the selected column(s), unless a grouped variable is explicitly
+  selected
+  >>> df >> group_by(X.a, X.b) >> select(X.c, X.b)
+  returns a dataframe like df[[X.a, X.c, X.b]]
   """
-  return lambda df: df[[column._name for column in args]]
+  def select_columns(df, args):
+    columns = [column._name for column in args]
+    if df._grouped_on:
+      for col in df._grouped_on[::-1]:
+        if col not in columns:
+          columns.insert(0, col)
+    return columns
+  return lambda df: df[select_columns(df, args)]
 
 
 def _dict_to_possibly_ordered_tuples(dict_):
