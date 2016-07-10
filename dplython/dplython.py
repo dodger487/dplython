@@ -142,9 +142,7 @@ class Verb(object):
     raise NotImplementedError()
 
 
-# @ApplyToDataframe
 class sift(Verb):
-# def sift(*args):
   """Filters rows of the data that meet input criteria.
 
   Giving multiple arguments to sift is equivalent to a logical "and".
@@ -165,7 +163,6 @@ class sift(Verb):
 
   __name__ = "sift"
 
-  # def f(df):
   def __call__(self, df):
     # TODO: This function is a candidate for improvement!
     final_filter = pandas.Series([True for t in range(len(df))])
@@ -182,7 +179,6 @@ class sift(Verb):
     return df
 
   def __rrshift__(self, other):
-    # return self.__call__(DplyFrame(other.copy(deep=True)))
     return self.__call__(other)
 
 
