@@ -72,8 +72,13 @@ class DplyFrame(DataFrame):
     self._grouped_on = None
     self._grouped_self = None
 
+  def regroup(self, names):
+    self.group_self(names)
+    return self
+
   def apply_on_groups(self, delayedFcn):
-    if isinstance(delayedFcn, mutate) or isinstance(delayedFcn, sift):
+    if delayedFcn.__name__ in ['mutate', 'sift', 'head', 'nrow']:
+    # if isinstance(delayedFcn, mutate) or isinstance(delayedFcn, sift) or isinstance(delayedFcn, head) or isinstance(delayedFcn, nrow):
       return delayedFcn(self)
 
     outDf = self._grouped_self.apply(delayedFcn)
@@ -339,10 +344,21 @@ def arrange(*args):
   return f
 
 
-@ApplyToDataframe
-def head(*args, **kwargs):
-  """Returns first n rows"""
-  return lambda df: df.head(*args, **kwargs)
+class head(Verb):
+  """returns first n rows; maintains grouping if present"""
+
+  __name__ = "head"
+
+  def __call__(self, df):
+    n = 5 if not self.args else self.args[0]
+    if df._grouped_on:
+      return (df >> ungroup()).head(n).regroup(df._grouped_on)
+    else:
+      return df.head(n)
+
+  def __rrshift__(self, other):
+    return self.__call__(other)
+
 
 
 @ApplyToDataframe
@@ -363,9 +379,18 @@ def sample(*args, **kwargs):
   return lambda df: df.sample(*args, **kwargs)
 
 
-@ApplyToDataframe
-def nrow():
-  return lambda df: len(df)
+class nrow(Verb):
+  """return number of rows"""
+
+  __name__ = "nrow"
+
+  def __call__(self, df):
+    return len(df >> ungroup())
+
+  def __rrshift__(self, other):
+    return self.__call__(other)
+
+
 
 
 @ApplyToDataframe

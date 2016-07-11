@@ -559,6 +559,28 @@ class TestAlternateAttrGrab(unittest.TestCase):
     equality = pd["0"] == dp["foo"]
     self.assertTrue(equality.all())
 
+class TestHead(unittest.TestCase):
+
+  diamonds = load_diamonds()
+
+  def testHeadGrouping(self):
+      diamonds = self.diamonds.copy()
+
+      diamonds_grouped_head = diamonds >> group_by(X.cut) >> head()
+      diamonds_ungrouped_head = diamonds >> head()
+      diamonds_pd_head = diamonds.head()
+      self.assertTrue(diamonds_grouped_head._grouped_on == ['cut'])
+      self.assertTrue(diamonds_ungrouped_head._grouped_on is None)
+      self.assertTrue(diamonds_grouped_head.equals(diamonds_pd_head))
+      self.assertTrue(diamonds_ungrouped_head.equals(diamonds_pd_head))
+      # pass n
+      diamonds_grouped_head = diamonds >> group_by(X.cut) >> head(17)
+      diamonds_ungrouped_head = diamonds >> head(17)
+      diamonds_pd_head = diamonds.head(17)
+      self.assertTrue(diamonds_grouped_head._grouped_on == ['cut'])
+      self.assertTrue(diamonds_ungrouped_head._grouped_on is None)
+      self.assertTrue(diamonds_grouped_head.equals(diamonds_pd_head))
+      self.assertTrue(diamonds_ungrouped_head.equals(diamonds_pd_head))
 
 class TestNrow(unittest.TestCase):
   diamonds = load_diamonds()
@@ -576,6 +598,13 @@ class TestNrow(unittest.TestCase):
     self.assertEqual(
         len(small_d), self.diamonds >> sift(X.carat > 4) >> nrow())
 
+  def testNrowGrouping(self):
+      diamonds = self.diamonds.copy()
+      diamonds_ungrouped_nrow = diamonds >> nrow()
+      diamonds_grouped_nrow = diamonds >> group_by(X.cut) >> nrow()
+      diamonds_nrow_pd = len(diamonds)
+      self.assertTrue(diamonds_grouped_nrow == diamonds_nrow_pd)
+      self.assertTrue(diamonds_ungrouped_nrow == diamonds_nrow_pd)
 
 class TestFunctionForm(unittest.TestCase):
   diamonds = load_diamonds()
