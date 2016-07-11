@@ -250,6 +250,14 @@ class TestSelects(unittest.TestCase):
     diamonds_dp = self.diamonds >> select(X.carat, X.cut)
     self.assertTrue(diamonds_pd.equals(diamonds_dp))    
 
+  def testGroupingImpliedSelect(self):
+    diamonds_pd = self.diamonds.copy()
+    diamonds_grouped_1 = diamonds_pd >> group_by(X.cut, X.clarity) >> select(X.x)
+    diamonds_selected_1 = diamonds_pd >> select(X.cut, X.clarity, X.x)
+    diamonds_grouped_2 = diamonds_pd >> group_by(X.cut, X.clarity) >> select(X.x, X.clarity)
+    diamonds_selected_2 = diamonds_pd >> select(X.cut, X.x, X.clarity)
+    self.assertTrue(diamonds_grouped_1.equals(diamonds_selected_1))
+    self.assertTrue(diamonds_grouped_2.equals(diamonds_selected_2))
 
 class TestFilters(unittest.TestCase):
   diamonds = load_diamonds()
