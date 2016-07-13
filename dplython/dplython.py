@@ -72,8 +72,16 @@ class DplyFrame(DataFrame):
     self._grouped_on = None
     self._grouped_self = None
 
+  def regroup(self, names):
+    self.group_self(names)
+    return self
+
   def apply_on_groups(self, delayedFcn):
-    if isinstance(delayedFcn, mutate) or isinstance(delayedFcn, sift):
+    # use names and a list instead of isinstance here to keep things manageable?
+    # if everything goes to verbs, can we even remove the apply on groups altogether?
+    if isinstance(delayedFcn, mutate) or isinstance(delayedFcn, sift) or isinstance(delayedFcn, inner_join) or \
+            isinstance(delayedFcn, full_join) or isinstance(delayedFcn, left_join) or \
+            isinstance(delayedFcn, right_join):
       return delayedFcn(self)
 
     outDf = self._grouped_self.apply(delayedFcn)
@@ -445,7 +453,7 @@ def get_join_cols(by_entry):
       right_cols.append(col[1])
   return left_cols, right_cols
 
-def mutating_join(right, **kwargs):
+def mutating_join(*args, **kwargs):
   """ generic function for mutating dplyr-style joins
   uses dplyr syntax
   >>> left_data >> inner_join(right_data, by=[join_columns_in_list_as_single_or_tuple], suffixes=(character_tuple_of_length_2)
@@ -465,6 +473,8 @@ def mutating_join(right, **kwargs):
   Currently, only the 4 mutating joins are implemented (left, right, inner, outer/full)
   """
   # candidate for improvement
+  left = args[0]
+  right = args[1]
   if 'by' in kwargs:
     left_cols, right_cols = get_join_cols(kwargs['by'])
   else:
@@ -473,23 +483,103 @@ def mutating_join(right, **kwargs):
     dsuffixes = kwargs['suffixes']
   else:
     dsuffixes = ('_x', '_y')
-  def f(df):
-    x = lambda df: DplyFrame(df.merge(right, how=kwargs['how'], left_on=left_cols, right_on=right_cols, suffixes=dsuffixes))
-    return x
-  return f
+  if left._grouped_on:
+    outDf = (DplyFrame((left >> ungroup())
+                       .merge(right, how=kwargs['how'], left_on=left_cols, right_on=right_cols, suffixes=dsuffixes))
+             .regroup(left._grouped_on))
+  else:
+    outDf = DplyFrame(left.merge(right, how=kwargs['how'], left_on=left_cols, right_on=right_cols, suffixes=dsuffixes))
+  return outDf
 
-@ApplyToDataframe
-def inner_join(right, **kwargs):
-  return mutating_join(right, how='inner', **kwargs)
 
-@ApplyToDataframe
-def full_join(right, **kwargs):
-  return mutating_join(right, how='outer', **kwargs)
+class inner_join(Verb):
+  """ Perform sql style inner join
+  """
 
-@ApplyToDataframe
-def left_join(right, **kwargs):
-  return mutating_join(right, how='left', **kwargs)
+  __name__ = 'inner_join'
 
-@ApplyToDataframe
-def right_join(right, **kwargs):
-  return mutating_join(right, how='right', **kwargs)
+  def __new__(cls, *args, **kwargs):
+    if len(args) > 1 and isinstance(args[0], pandas.DataFrame) and isinstance(args[1], pandas.DataFrame):
+      verb = cls(*args[1:], **kwargs)
+      return verb(args[0].copy(deep=True))
+    else:
+      return super(Verb, cls).__new__(cls)
+
+  def __call__(self, df):
+    if self.kwargs:
+      self.kwargs.update({'how': 'inner'})
+      return mutating_join(df, self.args[0], **self.kwargs)
+    else:
+      return mutating_join(df, self.args[0], how='inner')
+
+  def __rrshift__(self, other):
+    return self.__call__(other)
+
+class full_join(Verb):
+  """ Perform sql style full join
+  """
+
+  __name__ = 'full_join'
+
+  def __new__(cls, *args, **kwargs):
+    if len(args) > 1 and isinstance(args[0], pandas.DataFrame) and isinstance(args[1], pandas.DataFrame):
+      verb = cls(*args[1:], **kwargs)
+      return verb(args[0].copy(deep=True))
+    else:
+      return super(Verb, cls).__new__(cls)
+
+  def __call__(self, df):
+    if self.kwargs:
+      self.kwargs.update({'how': 'outer'})
+      return mutating_join(df, self.args[0], **self.kwargs)
+    else:
+      return mutating_join(df, self.args[0], how='outer')
+
+  def __rrshift__(self, other):
+    return self.__call__(other)
+
+class left_join(Verb):
+  """ Perform sql style left join
+  """
+
+  __name__ = 'full_join'
+
+  def __new__(cls, *args, **kwargs):
+    if len(args) > 1 and isinstance(args[0], pandas.DataFrame) and isinstance(args[1], pandas.DataFrame):
+      verb = cls(*args[1:], **kwargs)
+      return verb(args[0].copy(deep=True))
+    else:
+      return super(Verb, cls).__new__(cls)
+
+  def __call__(self, df):
+    if self.kwargs:
+      self.kwargs.update({'how': 'left'})
+      return mutating_join(df, self.args[0], **self.kwargs)
+    else:
+      return mutating_join(df, self.args[0], how='left')
+
+  def __rrshift__(self, other):
+    return self.__call__(other)
+
+class right_join(Verb):
+  """ Perform sql style right join
+  """
+
+  __name__ = 'right_join'
+
+  def __new__(cls, *args, **kwargs):
+    if len(args) > 1 and isinstance(args[0], pandas.DataFrame) and isinstance(args[1], pandas.DataFrame):
+      verb = cls(*args[1:], **kwargs)
+      return verb(args[0].copy(deep=True))
+    else:
+      return super(Verb, cls).__new__(cls)
+
+  def __call__(self, df):
+    if self.kwargs:
+      self.kwargs.update({'how': 'right'})
+      return mutating_join(df, self.args[0], **self.kwargs)
+    else:
+      return mutating_join(df, self.args[0], how='right')
+
+  def __rrshift__(self, other):
+    return self.__call__(other)

@@ -734,113 +734,151 @@ class TestJoinFunctions(unittest.TestCase):
 
   def test_inner_join(self):
     a = DplyFrame(pd.DataFrame({'x': [1, 1, 2, 3]
-                              , 'y': range(1, 5)}))
+                              , 'y': [1, 2, 3, 4]}))
     b = DplyFrame(pd.DataFrame({'x': [1, 2, 2, 4]
-                              , 'z': range(1, 5)}))
+                              , 'z': [1, 2, 3, 4]}))
     j_inner_test = a >> inner_join(b, by=['x'])
-    j_inner_pd = pd.DataFrame({'x': [1, 1, 2, 2]
+    j_inner_pd = DplyFrame(pd.DataFrame({'x': [1, 1, 2, 2]
                        , 'y': [1, 2, 3, 3]
-                       , 'z': [1, 1, 2, 3]})
-    self.assertTrue((j_inner_test == j_inner_pd).all().all())
+                       , 'z': [1, 1, 2, 3]}))
+    self.assertTrue(j_inner_test.equals(j_inner_pd))
     self.assertTrue(len(j_inner_test.columns.difference(j_inner_pd.columns)) == 0)
+    # test normal function
+    j1 = inner_join(a, b)
+    j2 = a >> inner_join(b)
+    self.assertTrue(j1.equals(j2))
+    j1 = inner_join(a, b, by=['x'])
+    j2 = a >> inner_join(b, by=['x'])
+    self.assertTrue(j1.equals(j2))
+    # test on grouped data
+    j1 = a >> group_by(X.x) >> inner_join(b)
+    # dataframes compare equal...
+    self.assertTrue(j1.equals(j2))
+    # but have different grouping
+    self.assertTrue(j1._grouped_on == ['x'])
+    self.assertTrue(j2._grouped_on is None)
+
+
 
   def test_full_join(self):
-    a = DplyFrame(pd.DataFrame({'x': range(1, 4)
-                                , 'y': range(2, 5)}))
-    b = DplyFrame(pd.DataFrame({'x': range(3, 6)
-                                , 'z': range(3, 6)}))
+    a = DplyFrame(pd.DataFrame({'x': [1, 2, 3]
+                                , 'y': [2, 3, 4]}))
+    b = DplyFrame(pd.DataFrame({'x': [3, 4, 5]
+                                , 'z': [3, 4, 5]}))
     j_full_test = a >> full_join(b, by=['x'])
-    j_full_pd = pd.DataFrame({'x': range(1, 6)
+    j_full_pd = DplyFrame(pd.DataFrame({'x': [1.0, 2.0, 3.0, 4.0, 5.0] # pandas promotes ints to floats in the join
                               , 'y': [2, 3, 4, np.nan, np.nan]
-                              , 'z': [np.nan, np.nan, 3, 4, 5]})
-    self.assertTrue((j_full_test.x == j_full_pd.x).all())
-    self.assertTrue((j_full_test.y[0:3] == [2, 3, 4]).all())
-    self.assertTrue(len(pd.isnull(j_full_test.y[3:5])) == 2)
-    self.assertTrue((j_full_test.z[2:6] == [3, 4, 5]).all())
-    self.assertTrue(len(pd.isnull(j_full_test.y[0:2])) == 2)
+                              , 'z': [np.nan, np.nan, 3, 4, 5]}))
+    self.assertTrue(j_full_test.equals(j_full_pd))
     self.assertTrue(len(j_full_test.columns.difference(j_full_pd.columns)) == 0)
+    # test normal form
+    j1 = full_join(a, b)
+    j2 = a >> full_join(b)
+    self.assertTrue(j1.equals(j2))
+    j1 = full_join(a, b, by=['x'])
+    j2 = a >> full_join(b, by=['x'])
+    self.assertTrue(j1.equals(j2))
+    # test on grouped data
+    j1 = a >> group_by(X.x) >> full_join(b)
+    # dataframes compare equal...
+    self.assertTrue(j1.equals(j2))
+    # but have different grouping
+    self.assertTrue(j1._grouped_on == ['x'])
+    self.assertTrue(j2._grouped_on is None)
+
 
   def test_left_join(self):
     a = DplyFrame(pd.DataFrame({'x': [1, 1, 2, 3]
-                                , 'y': range(1, 5)}))
+                                , 'y': [1, 2, 3, 4]}))
     b = DplyFrame(pd.DataFrame({'x': [1, 2, 2, 4]
-                                , 'z': range(1, 5)}))
+                                , 'z': [1, 2, 3, 4]}))
     j_left_test = a >> left_join(b, by=['x'])
-    j_left_pd = pd.DataFrame({'x': [1, 1, 2, 2, 3]
+    j_left_pd = DplyFrame(pd.DataFrame({'x': [1, 1, 2, 2, 3]
                               , 'y': [1, 2, 3, 3, 4]
-                              , 'z': [1, 1, 2, 3, np.nan]})
-    self.assertTrue((j_left_test.x == j_left_pd.x).all())
-    self.assertTrue((j_left_test.y == j_left_pd.y).all())
-    self.assertTrue((j_left_test.z[0:4] == j_left_pd.z[0:4]).all())
-    self.assertTrue(pd.isnull(j_left_pd.z[4]))
+                              , 'z': [1, 1, 2, 3, np.nan]}))
+    j_left_test.equals(j_left_pd)
     self.assertTrue(len(j_left_test.columns.difference(j_left_pd.columns)) == 0)
+    # test normal
+    j1 = left_join(a, b)
+    j2 = a >> left_join(b)
+    self.assertTrue(j1.equals(j2))
+    j1 = left_join(a, b, by=['x'])
+    j2 = a >> left_join(b, by=['x'])
+    self.assertTrue(j1.equals(j2))
+    # test on grouped data
+    j1 = a >> group_by(X.x) >> left_join(b)
+    # dataframes compare equal...
+    self.assertTrue(j1.equals(j2))
+    # but have different grouping
+    self.assertTrue(j1._grouped_on == ['x'])
+    self.assertTrue(j2._grouped_on is None)
 
   def test_right_join(self):
     a = DplyFrame(pd.DataFrame({'x': [1, 1, 2, 3]
-                                , 'y': range(1, 5)}))
+                                , 'y': [1, 2, 3, 4]}))
     b = DplyFrame(pd.DataFrame({'x': [1, 2, 2, 4]
-                                , 'z': range(1, 5)}))
+                                , 'z': [1, 2, 3, 4]}))
     j_right_test = a >> right_join(b, by=['x'])
-    j_right_pd = pd.DataFrame({'x': [1, 1, 2, 2, 4]
-                              , 'y': [1, 2, 3, 3, np.nan]
-                              , 'z': [1, 1, 2, 3, 4]})
-    self.assertTrue((j_right_test.x == j_right_pd.x).all())
-    self.assertTrue((j_right_test.z == j_right_pd.z).all())
-    self.assertTrue((j_right_test.y[0:4] == j_right_pd.y[0:4]).all())
-    self.assertTrue(pd.isnull(j_right_pd.y[4]))
+    j_right_pd = DplyFrame(pd.DataFrame({'x': [1.0, 1.0, 2.0, 2.0, 4.0]
+                              , 'y': [1.0, 2.0, 3.0, 3.0, np.nan]
+                              , 'z': [1, 1, 2, 3, 4]}))
+    self.assertTrue(j_right_test.equals(j_right_pd))
     self.assertTrue(len(j_right_test.columns.difference(j_right_pd.columns)) == 0)
+    # test normal form
+    j1 = right_join(a, b)
+    j2 = a >> right_join(b)
+    self.assertTrue(j1.equals(j2))
+    j1 = right_join(a, b, by=['x'])
+    j2 = a >> right_join(b, by=['x'])
+    self.assertTrue(j1.equals(j2))
+    # test on grouped data
+    j1 = a >> group_by(X.x) >> right_join(b)
+    # dataframes compare equal...
+    self.assertTrue(j1.equals(j2))
+    # but have different grouping
+    self.assertTrue(j1._grouped_on == ['x'])
+    self.assertTrue(j2._grouped_on is None)
 
   def test_suffixes_join(self):
     a = DplyFrame(pd.DataFrame({'x': [1, 1, 2, 3]
-                                , 'z': range(1, 5)}))
+                                , 'z': [1, 2, 3, 4]}))
     b = DplyFrame(pd.DataFrame({'x': [1, 2, 2, 4]
-                                , 'z': range(1, 5)}))
+                                , 'z': [1, 2, 3, 4]}))
     j_suffix_test = a >> left_join(b, by=['x'])
-    j_suffix_pd = pd.DataFrame({'x': [1, 1, 2, 2, 3]
+    j_suffix_pd = DplyFrame(pd.DataFrame({'x': [1, 1, 2, 2, 3]
                               , 'z_x': [1, 2, 3, 3, 4]
-                              , 'z_y': [1, 1, 2, 3, np.nan]})
+                              , 'z_y': [1.0, 1.0, 2.0, 3.0, np.nan]}))
     self.assertTrue((j_suffix_test.columns == j_suffix_pd.columns).all())
     j_suffix_test = a >> left_join(b, by=['x'], suffixes=('_1', '_2'))
-    j_suffix_pd = pd.DataFrame({'x': [1, 1, 2, 2, 3]
+    j_suffix_pd = DplyFrame(pd.DataFrame({'x': [1, 1, 2, 2, 3]
                               , 'z_1': [1, 2, 3, 3, 4]
-                              , 'z_2': [1, 1, 2, 3, np.nan]})
+                              , 'z_2': [1.0, 1.0, 2.0, 3.0, np.nan]}))
     self.assertTrue((j_suffix_test.columns == j_suffix_pd.columns).all())
 
   def test_multiple_columns_join(self):
 
     a = DplyFrame(pd.DataFrame({'x': [1, 1, 2, 3]
                                 , 'y': [1, 1, 2, 3]
-                                , 'a': range(1, 5)})[['x', 'y', 'a']])
+                                , 'a': [1, 2, 3, 4]})[['x', 'y', 'a']])
     b = DplyFrame(pd.DataFrame({'x': [1, 2, 2, 4]
                                 , 'y': [1, 2, 2, 4]
-                                , 'b': range(1, 5)})[['x', 'y', 'b']])
+                                , 'b': [1, 2, 3, 4]})[['x', 'y', 'b']])
     j_multiple_col_test = a >> left_join(b, by=['x', 'y'])
-    j_multiple_col_pd = pd.DataFrame({'x': [1, 1, 2, 2, 3]
+    j_multiple_col_pd = DplyFrame(pd.DataFrame({'x': [1, 1, 2, 2, 3]
                                       , 'y': [1, 1, 2, 2, 3]
                                       , 'a': [1, 2, 3, 3, 4]
-                                      , 'b': [1, 1, 2, 3, np.nan]})[['x', 'y', 'a', 'b']]
-    self.assertTrue((j_multiple_col_test.x == j_multiple_col_pd.x).all())
-    self.assertTrue((j_multiple_col_test.y == j_multiple_col_pd.y).all())
-    self.assertTrue((j_multiple_col_test.a == j_multiple_col_pd.a).all())
-    self.assertTrue((j_multiple_col_test.b[0:4] == j_multiple_col_pd.b[0:4]).all())
-    self.assertTrue(pd.isnull(j_multiple_col_test.b[4]))
+                                      , 'b': [1.0, 1.0, 2.0, 3.0, np.nan]}))[['x', 'y', 'a', 'b']]
+    self.assertTrue(j_multiple_col_test.equals(j_multiple_col_pd))
     b = DplyFrame(pd.DataFrame({'z': [1, 2, 2, 4]
                                 , 'y': [1, 2, 2, 4]
-                                , 'b': range(1, 5)})[['z', 'y', 'b']])
+                                , 'b': [1, 2, 3, 4]})[['z', 'y', 'b']])
     j_multiple_col_test = a >> left_join(b, by=[('x', 'z'), 'y'])
-    j_multiple_col_pd = pd.DataFrame({'x': [1, 1, 2, 2, 3]
+    j_multiple_col_pd =DplyFrame(pd.DataFrame({'x': [1, 1, 2, 2, 3]
                                       , 'y': [1, 1, 2, 2, 3]
                                       , 'a': [1, 2, 3, 3, 4]
-                                      , 'z': [1, 1, 2, 2, np.nan]
-                                      , 'b': [1, 1, 2, 3, np.nan]})[['x', 'y', 'z', 'a', 'b']]
-    self.assertTrue((j_multiple_col_test.x == j_multiple_col_pd.x).all())
-    self.assertTrue((j_multiple_col_test.y == j_multiple_col_pd.y).all())
-    self.assertTrue((j_multiple_col_test.a == j_multiple_col_pd.a).all())
-    self.assertTrue((j_multiple_col_test.b[0:4] == j_multiple_col_pd.b[0:4]).all())
-    self.assertTrue(pd.isnull(j_multiple_col_test.b[4]))
-    self.assertTrue((j_multiple_col_test.z[0:4] == j_multiple_col_pd.z[0:4]).all())
-    self.assertTrue(pd.isnull(j_multiple_col_test.z[4]))
-
+                                      , 'z': [1.0, 1.0, 2.0, 2.0, np.nan]
+                                      , 'b': [1.0, 1.0, 2.0, 3.0, np.nan]}))[['x', 'y', 'a', 'z', 'b']]
+    self.assertTrue(j_multiple_col_test.equals(j_multiple_col_pd))
 
 if __name__ == '__main__':
   unittest.main()
