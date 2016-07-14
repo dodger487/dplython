@@ -77,11 +77,9 @@ class DplyFrame(DataFrame):
     return self
 
   def apply_on_groups(self, delayedFcn):
-    # use names and a list instead of isinstance here to keep things manageable?
-    # if everything goes to verbs, can we even remove the apply on groups altogether?
-    if isinstance(delayedFcn, mutate) or isinstance(delayedFcn, sift) or isinstance(delayedFcn, inner_join) or \
-            isinstance(delayedFcn, full_join) or isinstance(delayedFcn, left_join) or \
-            isinstance(delayedFcn, right_join):
+
+    handled_classes = (mutate, sift, inner_join, full_join, left_join, right_join)
+    if isinstance(delayedFcn, handled_classes):
       return delayedFcn(self)
 
     outDf = self._grouped_self.apply(delayedFcn)
@@ -492,7 +490,7 @@ def mutating_join(*args, **kwargs):
   return outDf
 
 
-class MutatingJoin(Verb):
+class Join(Verb):
 
   def __new__(cls, *args, **kwargs):
     if len(args) > 1 and isinstance(args[0], pandas.DataFrame) and isinstance(args[1], pandas.DataFrame):
@@ -505,56 +503,44 @@ class MutatingJoin(Verb):
       return self.__call__(other)
 
 
-class inner_join(MutatingJoin):
+class inner_join(Join):
   """ Perform sql style inner join
   """
   __name__ = 'inner_join'
 
   def __call__(self, df):
-    if self.kwargs:
-      self.kwargs.update({'how': 'inner'})
-      return mutating_join(df, self.args[0], **self.kwargs)
-    else:
-      return mutating_join(df, self.args[0], how='inner')
+    self.kwargs.update({'how': 'inner'})
+    return mutating_join(df, self.args[0], **self.kwargs)
 
 
-class full_join(MutatingJoin):
+class full_join(Join):
   """ Perform sql style full join
   """
 
   __name__ = 'full_join'
 
   def __call__(self, df):
-    if self.kwargs:
-      self.kwargs.update({'how': 'outer'})
-      return mutating_join(df, self.args[0], **self.kwargs)
-    else:
-      return mutating_join(df, self.args[0], how='outer')
+    self.kwargs.update({'how': 'outer'})
+    return mutating_join(df, self.args[0], **self.kwargs)
 
 
-class left_join(MutatingJoin):
+class left_join(Join):
   """ Perform sql style left join
   """
 
   __name__ = 'left_join'
 
   def __call__(self, df):
-    if self.kwargs:
-      self.kwargs.update({'how': 'left'})
-      return mutating_join(df, self.args[0], **self.kwargs)
-    else:
-      return mutating_join(df, self.args[0], how='left')
+    self.kwargs.update({'how': 'left'})
+    return mutating_join(df, self.args[0], **self.kwargs)
 
 
-class right_join(MutatingJoin):
+class right_join(Join):
   """ Perform sql style right join
   """
 
   __name__ = 'right_join'
 
   def __call__(self, df):
-    if self.kwargs:
-      self.kwargs.update({'how': 'right'})
-      return mutating_join(df, self.args[0], **self.kwargs)
-    else:
-      return mutating_join(df, self.args[0], how='right')
+    self.kwargs.update({'how': 'right'})
+    return mutating_join(df, self.args[0], **self.kwargs)
