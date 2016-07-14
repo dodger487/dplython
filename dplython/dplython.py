@@ -438,7 +438,7 @@ def if_else(bool_series, series_true, series_false):
 
 def get_join_cols(by_entry):
   """ helper function used for joins
-  builds left and right join list for djoin function
+  builds left and right join list for join function
   """
   left_cols = []
   right_cols = []
@@ -453,22 +453,6 @@ def get_join_cols(by_entry):
 
 def mutating_join(*args, **kwargs):
   """ generic function for mutating dplyr-style joins
-  uses dplyr syntax
-  >>> left_data >> inner_join(right_data, by=[join_columns_in_list_as_single_or_tuple], suffixes=(character_tuple_of_length_2)
-  e.g. flights2 >> left_join(airports, by=[('origin', 'faa')]) >> head(5)
-
-  The by argument takes a list of columns. For a list like ['A', 'B'], it assumes 'A' and 'B' are columns in both
-  dataframes.
-  For a list like [('A', 'B')], it assumes column 'A' in the left dataframe is the same as column 'B' in the right dataframe.
-  Can mix and match (e.g. by=['A', ('B', 'C')] will assume both dataframes have column 'A', and column 'B' in the left
-  dataframe is the same as column 'C' in the right dataframe.
-  If by is not specified, then all shared columns will be assumed to be the join columns.
-
-  suffixes will be used to rename columns that are common to both dataframes, but not used in the join operation.
-  e.g. suffixes=('_1', '_2').
-  If suffixes is not included, then the pandas default will be used ('_x', '_y')
-
-  Currently, only the 4 mutating joins are implemented (left, right, inner, outer/full)
   """
   # candidate for improvement
   left = args[0]
@@ -491,6 +475,8 @@ def mutating_join(*args, **kwargs):
 
 
 class Join(Verb):
+  """ Generic class for two-table verbs
+  """
 
   def __new__(cls, *args, **kwargs):
     if len(args) > 1 and isinstance(args[0], pandas.DataFrame) and isinstance(args[1], pandas.DataFrame):
@@ -499,12 +485,29 @@ class Join(Verb):
     else:
       return super(Verb, cls).__new__(cls)
 
-    def __rrshift__(self, other):
+  def __rrshift__(self, other):
       return self.__call__(other)
 
 
 class inner_join(Join):
   """ Perform sql style inner join
+  >>> left_data >> inner_join(right_data[
+  ...                                    , by=[join_columns_in_list_as_single_or_tuple][
+  ...                                    , suffixes=('_x', _y)]])
+  e.g. flights2 >> inner_join(airports, by=[('origin', 'faa')]) >> head(5)
+
+  Select all rows from both tables where there are matches on specified columns.
+
+  The by argument takes a list of columns. For a list like ['A', 'B'], it assumes 'A' and 'B' are columns in both
+  dataframes.
+  For a list like [('A', 'B')], it assumes column 'A' in the left dataframe is the same as column 'B' in the right dataframe.
+  Can mix and match (e.g. by=['A', ('B', 'C')] will assume both dataframes have column 'A', and column 'B' in the left
+  dataframe is the same as column 'C' in the right dataframe.
+  If by is not specified, then all shared columns will be assumed to be the join columns.
+
+  suffixes will be used to rename columns that are common to both dataframes, but not used in the join operation.
+  e.g. suffixes=('_1', '_2').
+  If suffixes is not included, then the pandas default will be used ('_x', '_y')
   """
   __name__ = 'inner_join'
 
@@ -514,7 +517,25 @@ class inner_join(Join):
 
 
 class full_join(Join):
-  """ Perform sql style full join
+  """ Perform sql style outer/full join
+  >>> left_data >> full_join(right_data[
+  ...                                   , by=[join_columns_in_list_as_single_or_tuple][
+  ...                                   , suffixes=('_x', _y)]])
+  e.g. flights2 >> full_join(airports, by=[('origin', 'faa')]) >> head(5)
+
+  Select all rows from both tables, matching when possible, filling in missing values where data doesn't match.
+
+  The by argument takes a list of columns. For a list like ['A', 'B'], it assumes 'A' and 'B' are columns in both
+  dataframes.
+  For a list like [('A', 'B')], it assumes column 'A' in the left dataframe is the same as column 'B' in the right
+  dataframe.
+  Can mix and match (e.g. by=['A', ('B', 'C')] will assume both dataframes have column 'A', and column 'B' in the left
+  dataframe is the same as column 'C' in the right dataframe.
+  If by is not specified, then all shared columns will be assumed to be the join columns.
+
+  suffixes will be used to rename columns that are common to both dataframes, but not used in the join operation.
+  e.g. suffixes=('_1', '_2').
+  If suffixes is not included, then the pandas default will be used ('_x', '_y')
   """
 
   __name__ = 'full_join'
@@ -526,6 +547,25 @@ class full_join(Join):
 
 class left_join(Join):
   """ Perform sql style left join
+  >>> left_data >> left_join(right_data[
+  ...                                   , by=[join_columns_in_list_as_single_or_tuple][
+  ...                                   , suffixes=('_x', _y)]])
+  e.g. flights2 >> full_join(airports, by=[('origin', 'faa')]) >> head(5)
+
+  Select all rows from the left table, and corresponding rows from the right table where values match,
+  filling in missing values where data doesn't match.
+
+  The by argument takes a list of columns. For a list like ['A', 'B'], it assumes 'A' and 'B' are columns in both
+  dataframes.
+  For a list like [('A', 'B')], it assumes column 'A' in the left dataframe is the same as column 'B' in the right
+  dataframe.
+  Can mix and match (e.g. by=['A', ('B', 'C')] will assume both dataframes have column 'A', and column 'B' in the left
+  dataframe is the same as column 'C' in the right dataframe.
+  If by is not specified, then all shared columns will be assumed to be the join columns.
+
+  suffixes will be used to rename columns that are common to both dataframes, but not used in the join operation.
+  e.g. suffixes=('_1', '_2').
+  If suffixes is not included, then the pandas default will be used ('_x', '_y')
   """
 
   __name__ = 'left_join'
@@ -537,6 +577,25 @@ class left_join(Join):
 
 class right_join(Join):
   """ Perform sql style right join
+  >>> left_data >> right_join(right_data[
+  ...                                    , by=[join_columns_in_list_as_single_or_tuple][
+  ...                                    , suffixes=('_x', _y)]])
+  e.g. flights2 >> right_join(airports, by=[('origin', 'faa')]) >> head(5)
+
+  Select all rows from the right table, and corresponding rows from the left table where values match,
+  filling in missing values where data doesn't match.
+
+  The by argument takes a list of columns. For a list like ['A', 'B'], it assumes 'A' and 'B' are columns in both
+  dataframes.
+  For a list like [('A', 'B')], it assumes column 'A' in the left dataframe is the same as column 'B' in the right
+  dataframe.
+  Can mix and match (e.g. by=['A', ('B', 'C')] will assume both dataframes have column 'A', and column 'B' in the left
+  dataframe is the same as column 'C' in the right dataframe.
+  If by is not specified, then all shared columns will be assumed to be the join columns.
+
+  suffixes will be used to rename columns that are common to both dataframes, but not used in the join operation.
+  e.g. suffixes=('_1', '_2').
+  If suffixes is not included, then the pandas default will be used ('_x', '_y')
   """
 
   __name__ = 'right_join'
