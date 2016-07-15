@@ -72,8 +72,14 @@ class DplyFrame(DataFrame):
     self._grouped_on = None
     self._grouped_self = None
 
+  def regroup(self, names):
+    self.group_self(names)
+    return self
+
   def apply_on_groups(self, delayedFcn):
-    if isinstance(delayedFcn, mutate) or isinstance(delayedFcn, sift):
+
+    handled_classes = (mutate, sift, inner_join, full_join, left_join, right_join)
+    if isinstance(delayedFcn, handled_classes):
       return delayedFcn(self)
 
     outDf = self._grouped_self.apply(delayedFcn)
@@ -203,8 +209,22 @@ def select(*args):
   0     E   0.23
   1     E   0.21
   2     E   0.23
+    Grouping variables are implied in selection.
+  >>> df >> group_by(X.a, X.b) >> select(X.c)
+  returns a dataframe like df[[X.a, X.b, X.c]]
+  with the variables appearing in grouped order before the selected column(s), unless a grouped variable is explicitly
+  selected
+  >>> df >> group_by(X.a, X.b) >> select(X.c, X.b)
+  returns a dataframe like df[[X.a, X.c, X.b]]
   """
-  return lambda df: df[[column._name for column in args]]
+  def select_columns(df, args):
+    columns = [column._name for column in args]
+    if df._grouped_on:
+      for col in df._grouped_on[::-1]:
+        if col not in columns:
+          columns.insert(0, col)
+    return columns
+  return lambda df: df[select_columns(df, args)]
 
 
 def _dict_to_possibly_ordered_tuples(dict_):
@@ -419,7 +439,7 @@ def if_else(bool_series, series_true, series_false):
 
 def get_join_cols(by_entry):
   """ helper function used for joins
-  builds left and right join list for djoin function
+  builds left and right join list for join function
   """
   left_cols = []
   right_cols = []
@@ -432,11 +452,52 @@ def get_join_cols(by_entry):
       right_cols.append(col[1])
   return left_cols, right_cols
 
-def mutating_join(right, **kwargs):
+def mutating_join(*args, **kwargs):
   """ generic function for mutating dplyr-style joins
-  uses dplyr syntax
-  >>> left_data >> inner_join(right_data, by=[join_columns_in_list_as_single_or_tuple], suffixes=(character_tuple_of_length_2)
-  e.g. flights2 >> left_join(airports, by=[('origin', 'faa')]) >> head(5)
+  """
+  # candidate for improvement
+  left = args[0]
+  right = args[1]
+  if 'by' in kwargs:
+    left_cols, right_cols = get_join_cols(kwargs['by'])
+  else:
+    left_cols, right_cols = None, None
+  if 'suffixes' in kwargs:
+    dsuffixes = kwargs['suffixes']
+  else:
+    dsuffixes = ('_x', '_y')
+  if left._grouped_on:
+    outDf = (DplyFrame((left >> ungroup())
+                       .merge(right, how=kwargs['how'], left_on=left_cols, right_on=right_cols, suffixes=dsuffixes))
+             .regroup(left._grouped_on))
+  else:
+    outDf = DplyFrame(left.merge(right, how=kwargs['how'], left_on=left_cols, right_on=right_cols, suffixes=dsuffixes))
+  return outDf
+
+
+class Join(Verb):
+  """ Generic class for two-table verbs
+  """
+
+  def __new__(cls, *args, **kwargs):
+    if len(args) > 1 and isinstance(args[0], pandas.DataFrame) and isinstance(args[1], pandas.DataFrame):
+      verb = cls(*args[1:], **kwargs)
+      return verb(args[0].copy(deep=True))
+    else:
+      return super(Verb, cls).__new__(cls)
+
+  def __rrshift__(self, other):
+      return self.__call__(other)
+
+
+class inner_join(Join):
+  """ Perform sql style inner join
+  >>> left_data >> inner_join(right_data[
+  ...                                    , by=[join_columns_in_list_as_single_or_tuple][
+  ...                                    , suffixes=('_x', _y)]])
+  e.g. flights2 >> inner_join(airports, by=[('origin', 'faa')]) >> head(5)
+
+  Select all rows from both tables where there are matches on specified columns.
 
   The by argument takes a list of columns. For a list like ['A', 'B'], it assumes 'A' and 'B' are columns in both
   dataframes.
@@ -448,35 +509,98 @@ def mutating_join(right, **kwargs):
   suffixes will be used to rename columns that are common to both dataframes, but not used in the join operation.
   e.g. suffixes=('_1', '_2').
   If suffixes is not included, then the pandas default will be used ('_x', '_y')
-
-  Currently, only the 4 mutating joins are implemented (left, right, inner, outer/full)
   """
-  # candidate for improvement
-  if 'by' in kwargs:
-    left_cols, right_cols = get_join_cols(kwargs['by'])
-  else:
-    left_cols, right_cols = None, None
-  if 'suffixes' in kwargs:
-    dsuffixes = kwargs['suffixes']
-  else:
-    dsuffixes = ('_x', '_y')
-  def f(df):
-    x = lambda df: DplyFrame(df.merge(right, how=kwargs['how'], left_on=left_cols, right_on=right_cols, suffixes=dsuffixes))
-    return x
-  return f
+  __name__ = 'inner_join'
 
-@ApplyToDataframe
-def inner_join(right, **kwargs):
-  return mutating_join(right, how='inner', **kwargs)
+  def __call__(self, df):
+    self.kwargs.update({'how': 'inner'})
+    return mutating_join(df, self.args[0], **self.kwargs)
 
-@ApplyToDataframe
-def full_join(right, **kwargs):
-  return mutating_join(right, how='outer', **kwargs)
 
-@ApplyToDataframe
-def left_join(right, **kwargs):
-  return mutating_join(right, how='left', **kwargs)
+class full_join(Join):
+  """ Perform sql style outer/full join
+  >>> left_data >> full_join(right_data[
+  ...                                   , by=[join_columns_in_list_as_single_or_tuple][
+  ...                                   , suffixes=('_x', _y)]])
+  e.g. flights2 >> full_join(airports, by=[('origin', 'faa')]) >> head(5)
 
-@ApplyToDataframe
-def right_join(right, **kwargs):
-  return mutating_join(right, how='right', **kwargs)
+  Select all rows from both tables, matching when possible, filling in missing values where data doesn't match.
+
+  The by argument takes a list of columns. For a list like ['A', 'B'], it assumes 'A' and 'B' are columns in both
+  dataframes.
+  For a list like [('A', 'B')], it assumes column 'A' in the left dataframe is the same as column 'B' in the right
+  dataframe.
+  Can mix and match (e.g. by=['A', ('B', 'C')] will assume both dataframes have column 'A', and column 'B' in the left
+  dataframe is the same as column 'C' in the right dataframe.
+  If by is not specified, then all shared columns will be assumed to be the join columns.
+
+  suffixes will be used to rename columns that are common to both dataframes, but not used in the join operation.
+  e.g. suffixes=('_1', '_2').
+  If suffixes is not included, then the pandas default will be used ('_x', '_y')
+  """
+
+  __name__ = 'full_join'
+
+  def __call__(self, df):
+    self.kwargs.update({'how': 'outer'})
+    return mutating_join(df, self.args[0], **self.kwargs)
+
+
+class left_join(Join):
+  """ Perform sql style left join
+  >>> left_data >> left_join(right_data[
+  ...                                   , by=[join_columns_in_list_as_single_or_tuple][
+  ...                                   , suffixes=('_x', _y)]])
+  e.g. flights2 >> full_join(airports, by=[('origin', 'faa')]) >> head(5)
+
+  Select all rows from the left table, and corresponding rows from the right table where values match,
+  filling in missing values where data doesn't match.
+
+  The by argument takes a list of columns. For a list like ['A', 'B'], it assumes 'A' and 'B' are columns in both
+  dataframes.
+  For a list like [('A', 'B')], it assumes column 'A' in the left dataframe is the same as column 'B' in the right
+  dataframe.
+  Can mix and match (e.g. by=['A', ('B', 'C')] will assume both dataframes have column 'A', and column 'B' in the left
+  dataframe is the same as column 'C' in the right dataframe.
+  If by is not specified, then all shared columns will be assumed to be the join columns.
+
+  suffixes will be used to rename columns that are common to both dataframes, but not used in the join operation.
+  e.g. suffixes=('_1', '_2').
+  If suffixes is not included, then the pandas default will be used ('_x', '_y')
+  """
+
+  __name__ = 'left_join'
+
+  def __call__(self, df):
+    self.kwargs.update({'how': 'left'})
+    return mutating_join(df, self.args[0], **self.kwargs)
+
+
+class right_join(Join):
+  """ Perform sql style right join
+  >>> left_data >> right_join(right_data[
+  ...                                    , by=[join_columns_in_list_as_single_or_tuple][
+  ...                                    , suffixes=('_x', _y)]])
+  e.g. flights2 >> right_join(airports, by=[('origin', 'faa')]) >> head(5)
+
+  Select all rows from the right table, and corresponding rows from the left table where values match,
+  filling in missing values where data doesn't match.
+
+  The by argument takes a list of columns. For a list like ['A', 'B'], it assumes 'A' and 'B' are columns in both
+  dataframes.
+  For a list like [('A', 'B')], it assumes column 'A' in the left dataframe is the same as column 'B' in the right
+  dataframe.
+  Can mix and match (e.g. by=['A', ('B', 'C')] will assume both dataframes have column 'A', and column 'B' in the left
+  dataframe is the same as column 'C' in the right dataframe.
+  If by is not specified, then all shared columns will be assumed to be the join columns.
+
+  suffixes will be used to rename columns that are common to both dataframes, but not used in the join operation.
+  e.g. suffixes=('_1', '_2').
+  If suffixes is not included, then the pandas default will be used ('_x', '_y')
+  """
+
+  __name__ = 'right_join'
+
+  def __call__(self, df):
+    self.kwargs.update({'how': 'right'})
+    return mutating_join(df, self.args[0], **self.kwargs)
