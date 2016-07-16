@@ -17,8 +17,11 @@ import numpy as np
 import pandas
 from pandas import DataFrame
 
-from later import (Later, CreateLaterFunction, DelayFunction, X,
-                   Manager)
+try:
+  from .later import (Later, CreateLaterFunction, DelayFunction, X, Manager)
+except:
+  from later import (Later, CreateLaterFunction, DelayFunction, X, Manager)
+
 
 __version__ = "0.0.5"
 
