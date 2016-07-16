@@ -20,7 +20,7 @@ from pandas import DataFrame
 from later import (Later, CreateLaterFunction, DelayFunction, X,
                    Manager)
 
-__version__ = "0.0.4"
+__version__ = "0.0.5"
 
 
 def _addQuotes(item):
