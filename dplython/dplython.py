@@ -78,7 +78,7 @@ class DplyFrame(DataFrame):
 
   def apply_on_groups(self, delayedFcn):
 
-    handled_classes = (mutate, sift, inner_join, full_join, left_join, right_join)
+    handled_classes = (mutate, sift, inner_join, full_join, left_join, right_join, summarize)
     if isinstance(delayedFcn, handled_classes):
       return delayedFcn(self)
 
@@ -94,8 +94,6 @@ class DplyFrame(DataFrame):
     # Drop all 0 index, created by summarize
     if (outDf.index == 0).all():
       outDf.reset_index(drop=True, inplace=True)
-    if 'summarize' in str(delayedFcn).lower():
-      return outDf >> ungroup()
     outDf.group_self(self._grouped_on)
     return outDf
 
@@ -306,17 +304,39 @@ def group_by(*args, **kwargs):
   return GroupDF
 
 
-@ApplyToDataframe
-def summarize(**kwargs):
-  def CreateSummarizedDf(df):
-    input_dict = {k: val.evaluate(df) for k, val in six.iteritems(kwargs)}
-    if len(input_dict) == 0:
-      return DplyFrame({}, index=index)
-    if hasattr(df, "_current_group") and df._current_group:
-      input_dict.update(df._current_group)
-    index = [0]
-    return DplyFrame(input_dict, index=index)
-  return CreateSummarizedDf
+class summarize(Verb):
+  """Summarizes a dataset via functions
+  >>>(diamonds >>
+  ...        group_by(X.cut, X.carat_bin) >>
+  ...        summarize(avg_price=X.price.mean()))
+  If the dataset has grouping, summarizing will be done for each group, otherwise, will return a single row
+  """
+
+  def __call__(self, df):
+    def summarize(df):
+      input_dict = {k: val.evaluate(df) for k, val in six.iteritems(self.kwargs)}
+      if len(input_dict) == 0:
+        return DplyFrame({}, index=index)
+      if hasattr(df, "_current_group") and df._current_group:
+        input_dict.update(df._current_group)
+      index = [0]
+      return DplyFrame(input_dict, index=index)
+    if df._grouped_on:
+      outDf = df._grouped_self.apply(summarize)
+    else:
+      outDf = summarize(df)
+
+    # Remove multi-index created from grouping and applying
+    for grouped_name in outDf.index.names[:-1]:
+      if grouped_name in outDf:
+        outDf.reset_index(level=0, drop=True, inplace=True)
+      else:
+        outDf.reset_index(level=0, inplace=True)
+
+    # Drop all 0 index, created by summarize
+    if (outDf.index == 0).all():
+      outDf.reset_index(drop=True, inplace=True)
+    return outDf >> ungroup()
 
 
 @ApplyToDataframe
