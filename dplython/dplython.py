@@ -81,7 +81,7 @@ class DplyFrame(DataFrame):
 
   def apply_on_groups(self, delayedFcn):
 
-    handled_classes = (mutate, sift, inner_join, full_join, left_join, right_join)
+    handled_classes = (mutate, sift, inner_join, full_join, left_join, right_join, gather)
     if isinstance(delayedFcn, handled_classes):
       return delayedFcn(self)
 
@@ -606,3 +606,24 @@ class right_join(Join):
   def __call__(self, df):
     self.kwargs.update({'how': 'right'})
     return mutating_join(df, self.args[0], **self.kwargs)
+
+
+class gather(Verb):
+  """Convert data from wide to long
+  >>> df >> gather(key, value, columns)
+  create a new column, key, consisting of the values in the columns values, creating key-value pairs
+  eg
+  flights >> gather('delay', 'value', [X.dep_delay, X.arr_delay])
+  takes the two columns dep_delay and arr_delay, combines them into a single column called 'value', and creates another
+  column 'delay' that indicates whether each value comes from dep_delay or arr_delay
+  """
+
+  __name__ = 'gather'
+
+  def __call__(self, df):
+    df_cols = df.columns.values.tolist()
+    id_vals = [col._name for col in self.args[2]]
+    id_vars = [col for col in df_cols if col not in id_vals]
+    key = self.args[0]
+    value = self.args[1]
+    return pandas.melt(df, id_vars, id_vals, key, value)
