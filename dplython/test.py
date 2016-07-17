@@ -8,6 +8,7 @@ import math
 import unittest
 import os
 
+import sys
 if sys.version_info[0] < 3:
   from StringIO import StringIO
 else:
