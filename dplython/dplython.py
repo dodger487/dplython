@@ -637,3 +637,4 @@ class spread(Verb):
     old_data = out_df[spread_index_columns].drop_duplicates()
     output_data = old_data.merge(new_data, left_index=True, right_index=True).reset_index(drop=True)
     return output_data
+  
