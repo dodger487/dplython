@@ -81,7 +81,7 @@ class DplyFrame(DataFrame):
 
   def apply_on_groups(self, delayedFcn):
 
-    handled_classes = (mutate, sift, inner_join, full_join, left_join, right_join)
+    handled_classes = (mutate, sift, inner_join, full_join, left_join, right_join, spread)
     if isinstance(delayedFcn, handled_classes):
       return delayedFcn(self)
 
@@ -606,3 +606,34 @@ class right_join(Join):
   def __call__(self, df):
     self.kwargs.update({'how': 'right'})
     return mutating_join(df, self.args[0], **self.kwargs)
+
+
+def new_spread_cols(df, cols):
+  temp_index_for_reshape = ['' for i in range(len(df))]
+  for col in cols:
+    temp_index_for_reshape += df[col].map(str)
+  return temp_index_for_reshape
+
+
+class spread(Verb):
+  """Convert data from long to wide by spreading out data amongst key-value pairs
+  >>> df >> spread(key, value)
+  makes a new dataframe, where the values of key becomes column names, with the associated value becoming the value
+  for that column
+  """
+
+  __name__ = 'spread'
+
+  def __call__(self, df):
+    key = self.args[0]
+    values = self.args[1]
+    df_columns = df.columns.values.tolist()
+    spread_index_columns = [col for col in df_columns if col not in [key._name, values._name]]
+    temp_columns = new_spread_cols(df, spread_index_columns)
+    out_df = (df >> ungroup()).assign(temp_index_for_reshape=temp_columns)
+    out_df = out_df.set_index('temp_index_for_reshape')
+    new_spread_data = out_df[[key._name, values._name]]
+    new_data = new_spread_data.pivot(columns=key._name, values=values._name)
+    old_data = out_df[spread_index_columns].drop_duplicates()
+    output_data = old_data.merge(new_data, left_index=True, right_index=True).reset_index(drop=True)
+    return output_data
