@@ -633,8 +633,9 @@ class spread(Verb):
     out_df = (df >> ungroup()).assign(temp_index_for_reshape=temp_columns)
     out_df = out_df.set_index('temp_index_for_reshape')
     new_spread_data = out_df[[key._name, values._name]]
+    if not all(new_spread_data.groupby([new_spread_data.index, key._name]).agg('count').reset_index().value < 2):
+      raise ValueError('Duplicate identifers')
     new_data = new_spread_data.pivot(columns=key._name, values=values._name)
     old_data = out_df[spread_index_columns].drop_duplicates()
     output_data = old_data.merge(new_data, left_index=True, right_index=True).reset_index(drop=True)
     return output_data
-  

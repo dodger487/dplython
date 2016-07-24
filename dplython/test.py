@@ -940,6 +940,14 @@ China,2000,213766,1280428583""")))
     self.assertTrue(input_pd.equals(spread_test_df_2))
     self.assertTrue(input_pd.equals(spread_test_df_3))
 
+  def test_spread_3(self):
+    # duplicate identifiers should raise exception
+    input_df = DplyFrame(pd.read_csv(StringIO("""country,year,key,value
+1,Afghanistan,1999,cases,745
+2,Afghanistan,1999,cases,19987071""")))
+    self.assertRaises(ValueError, spread, input_df, X.key, X.value)
+
+
 
 if __name__ == '__main__':
   unittest.main()
