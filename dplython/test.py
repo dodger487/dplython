@@ -404,8 +404,7 @@ class TestGroupBy(unittest.TestCase):
       group_by(X.cut, X.color + X.clarity) >>
       summarize(total_price=X.price.sum())
     )
-    for row in diamonds_grouped.itertuples():
-      self.assertEqual(row.total_price, diamonds_pd[row.cut][row._1])
+    self.assertTrue((diamonds_grouped.total_price ==  diamonds_pd.values).all())
 
   def testGroupByIterable(self):
     diamonds_pd = self.diamonds.copy()

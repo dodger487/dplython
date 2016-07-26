@@ -326,10 +326,15 @@ class Later(object):
     self._previous = previous
     self._name = name
 
-  def evaluate(self, previousResult, original=None, fast=False):
+  def evaluate(self, previousResult, original=None, special=None):
+    if special not in {None, "transform", "agg"}:
+      raise Exception("Special must be one of None, 'transform', or 'agg'.")
+
     original = original if original is not None else previousResult
 
-    if original._grouped_self and fast and not isinstance(self._queue[0], FunctionStep):
+    if (original._grouped_self
+        and special 
+        and not isinstance(self._queue[0], FunctionStep)):
       name = GetName(self)
 
       # TODO: Rewrite this, this is terrible.
@@ -340,12 +345,15 @@ class Later(object):
           break
 
       transform_input = lambda x: reduce(
-          lambda prevResult, f: f.evaluate(prevResult, original, fast=fast),
+          lambda prevResult, f: f.evaluate(prevResult, original, special=special),
           self._queue[1:go_to_index],
           x
       )
-      out = original._grouped_self[name].transform(transform_input)
-      out = reduce(lambda prevResult, f: f.evaluate(prevResult, original, fast=fast),
+      if special == "transform":
+        out = original._grouped_self[name].transform(transform_input)
+      elif special == "agg":
+        out = original._grouped_self[name].agg(transform_input)
+      out = reduce(lambda prevResult, f: f.evaluate(prevResult, original, special=special),
                       self._queue[go_to_index:],
                       out)
       return out
@@ -354,11 +362,6 @@ class Later(object):
                       self._queue,
                       original)
       return output
-
-    # currentResult = previousResult
-    # for step in self._queue:
-    #   currentResult = step.evaluate(currentResult, original=original)
-    # return currentResult
     
   def __str__(self):
     return self._step.format_operation(self._previous)
