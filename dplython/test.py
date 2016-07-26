@@ -8,6 +8,13 @@ import math
 import unittest
 import os
 
+# import this for quick dataframe creation
+import sys
+if sys.version_info[0] < 3:
+  from StringIO import StringIO
+else:
+  from io import StringIO
+
 import numpy as np
 import numpy.testing as npt
 import pandas as pd
@@ -730,7 +737,7 @@ class TestTransmute(unittest.TestCase):
                               __order=('new_price', 'x_plus_y')))
     self.assertTrue(mutate_select_df.equals(transmute_df))
 
-class TestJoinFunctions(unittest.TestCase):
+class TestMutatingJoins(unittest.TestCase):
 
   def test_inner_join(self):
     a = DplyFrame(pd.DataFrame({'x': [1, 1, 2, 3]
@@ -879,6 +886,206 @@ class TestJoinFunctions(unittest.TestCase):
                                       , 'z': [1.0, 1.0, 2.0, 2.0, np.nan]
                                       , 'b': [1.0, 1.0, 2.0, 3.0, np.nan]}))[['x', 'y', 'a', 'z', 'b']]
     self.assertTrue(j_multiple_col_test.equals(j_multiple_col_pd))
+
+
+class TestFilteringJoins(unittest.TestCase):
+
+  superheroes = """name,alignment,gender,publisher
+Magneto,bad,male,Marvel
+Storm,good,female,Marvel
+Mystique,bad,female,Marvel
+Batman,good,male,DC
+Joker,bad,male,DC
+Catwoman,bad,female,DC
+Hellboy,good,male,DarkHorseComics
+"""
+  superheroes = DplyFrame(pd.read_csv(StringIO(superheroes)))
+
+  publishers = """publisher,yr_founded
+DC,1934
+Marvel,1939
+Image,1992
+"""
+  publishers = DplyFrame(pd.read_csv(StringIO(publishers)))
+  publishers_2 = publishers.rename(columns={'publisher': 'publisher_2', 'yr_founded': 'yr_founded_2'})
+
+  def test_semi_join_1(self):
+    j_test = self.superheroes >> semi_join(self.publishers)
+    j_pd = DplyFrame(pd.read_csv(StringIO("""name,alignment,gender,publisher
+Magneto,bad,male,Marvel
+Storm,good,female,Marvel
+Mystique,bad,female,Marvel
+Batman,good,male,DC
+Joker,bad,male,DC
+Catwoman,bad,female,DC""")))
+    self.assertTrue(j_test.equals(j_pd))
+    # names don't matter
+    j_test = self.superheroes >> semi_join(self.publishers_2, by=[('publisher', 'publisher_2')])
+    self.assertTrue(j_test.equals(j_pd))
+    # works in normal form
+    j1 = semi_join(self.superheroes, self.publishers)
+    j2 = self.superheroes >> semi_join(self.publishers)
+    self.assertTrue(j1.equals(j2))
+    # works on grouped data
+    j1 = self.superheroes >> group_by(X.publisher) >> semi_join(self.publishers)
+    # compares equal
+    self.assertTrue(j1.equals(j2))
+    # but don't group the same
+    self.assertTrue(j1._grouped_on == ['publisher'])
+    self.assertTrue(j2._grouped_on is None)
+
+
+  def test_anti_join_1(self):
+    j_test = self.superheroes >> anti_join(self.publishers)
+    j_pd = DplyFrame(pd.read_csv(StringIO("""index,name,alignment,gender,publisher
+6,Hellboy,good,male,DarkHorseComics""")).set_index(['index']))
+    j_pd.index.name = None
+    self.assertTrue(j_test.equals(j_pd))
+    j_test = self.superheroes >> anti_join(self.publishers_2, by=[('publisher', 'publisher_2')])
+    # names don't matter
+    self.assertTrue(j_test.equals(j_pd))
+    # works in normal form
+    j1 = anti_join(self.superheroes, self.publishers)
+    j2 = self.superheroes >> anti_join(self.publishers)
+    self.assertTrue(j1.equals(j2))
+    # works on grouped data
+    j1 = self.superheroes >> group_by(X.publisher) >> anti_join(self.publishers)
+    # compares equal
+    self.assertTrue(j1.equals(j2))
+    # but don't group the same
+    self.assertTrue(j1._grouped_on == ['publisher'])
+    self.assertTrue(j2._grouped_on is None)
+
+  def test_semi_join_2(self):
+    j_test = self.publishers >> semi_join(self.superheroes)
+    j_pd = DplyFrame(pd.read_csv(StringIO("""publisher,yr_founded
+DC,1934
+Marvel,1939""")))
+    self.assertTrue(j_test.equals(j_pd))
+    # names don't matter
+    j_test = self.publishers_2 >> semi_join(self.superheroes, by=[('publisher_2', 'publisher')])
+    j_pd = DplyFrame(pd.read_csv(StringIO("""publisher_2,yr_founded_2
+DC,1934
+Marvel,1939""")))
+    self.assertTrue(j_test.equals(j_pd))
+
+  def test_anti_join_2(self):
+    j_test = self.publishers >> anti_join(self.superheroes)
+    j_pd = DplyFrame(pd.read_csv(StringIO("""index,publisher,yr_founded
+2,Image,1992""")).set_index(['index']))
+    self.assertTrue(j_test.equals(j_pd))
+    # names don't matter
+    j_test = self.publishers_2 >> anti_join(self.superheroes, by=[('publisher_2', 'publisher')])
+    j_pd = DplyFrame(pd.read_csv(StringIO("""index,publisher_2,yr_founded_2
+2,Image,1992""")).set_index(['index']))
+    self.assertTrue(j_test.equals(j_pd))
+
+  a = DplyFrame(pd.read_csv(StringIO("""x,y
+1,1
+1,2
+2,3
+3,4""")))
+  b = DplyFrame(pd.read_csv(StringIO("""x,z
+1,1
+2,2
+2,3
+4,4""")))
+
+  def test_semi_join_dplyr_1(self):
+    j_test_1 = self.a >> semi_join(self.b)
+    j_test_2 = self.b >> semi_join(self.a)
+    j_pd_1 = DplyFrame(pd.read_csv(StringIO("""x,y
+1,1
+1,2
+2,3""")))
+    j_pd_2 = DplyFrame(pd.read_csv(StringIO("""x,z
+1,1
+2,2
+2,3""")))
+    self.assertTrue(j_test_1.equals(j_pd_1))
+    self.assertTrue(j_test_2.equals(j_pd_2))
+
+  def test_anti_join_dplyr_1(self):
+    j_test_1 = self.a >> anti_join(self.b)
+    j_test_2 = self.b >> anti_join(self.a)
+    j_pd_1 = DplyFrame(pd.read_csv(StringIO("""index,x,y
+3,3,4""")).set_index(['index']))
+    j_pd_1.index.name = None
+    j_pd_2 = DplyFrame(pd.read_csv(StringIO("""index,x,z
+3,4,4""")).set_index(['index']))
+    j_pd_2.index.name = None
+    self.assertTrue(j_test_1.equals(j_pd_1))
+    self.assertTrue(j_test_2.equals(j_pd_2))
+
+  c = DplyFrame(pd.read_csv(StringIO("""x,y,a
+1,1,1
+1,1,2
+2,2,3
+3,3,4""")))
+  d = DplyFrame(pd.read_csv(StringIO("""x,y,b
+1,1,1
+2,2,2
+2,2,3
+4,4,4""")))
+
+  def test_semi_join_dplyr_2(self):
+    # bivariate keys
+    j_test_1 = self.c >> semi_join(self.d)
+    j_test_2 = self.d >> semi_join(self.c)
+    j_pd_1 = DplyFrame(pd.read_csv(StringIO("""x,y,a
+1,1,1
+1,1,2
+2,2,3""")))
+    j_pd_2 = DplyFrame(pd.read_csv(StringIO("""x,y,b
+1,1,1
+2,2,2
+2,2,3""")))
+    self.assertTrue(j_test_1.equals(j_pd_1))
+    self.assertTrue(j_test_2.equals(j_pd_2))
+    # include column names
+    j_test_1 = self.c >> semi_join(self.d, by=['x', 'y'])
+    j_test_2 = self.d >> semi_join(self.c, by=['x', 'y'])
+    self.assertTrue(j_test_1.equals(j_pd_1))
+    self.assertTrue(j_test_2.equals(j_pd_2))
+    # use different column names
+    alt_c = self.c.rename(columns={'x': 'x_2'})
+    j_test_1 = alt_c >> semi_join(self.d, by=[('x_2', 'x'), 'y'])
+    j_test_2 = self.d >> semi_join(alt_c, by=[('x', 'x_2'), 'y'])
+    j_pd_1 = DplyFrame(pd.read_csv(StringIO("""x_2,y,a
+1,1,1
+1,1,2
+2,2,3""")))
+    self.assertTrue(j_test_1.equals(j_pd_1))
+    self.assertTrue(j_test_2.equals(j_pd_2))
+
+  def test_anti_join_dplyr_2(self):
+    # bivariate keys
+    j_test_1 = self.c >> anti_join(self.d)
+    j_test_2 = self.d >> anti_join(self.c)
+    j_pd_1 = DplyFrame(pd.read_csv(StringIO("""index,x,y,a
+3,3,3,4""")).set_index(['index']))
+    j_pd_1.index.name = None
+    j_pd_2 = DplyFrame(pd.read_csv(StringIO("""index,x,y,b
+3,4,4,4""")).set_index(['index']))
+    j_pd_2.index.name = None
+    self.assertTrue(j_test_1.equals(j_pd_1))
+    self.assertTrue(j_test_2.equals(j_pd_2))
+    # use column names
+    j_test_1 = self.c >> anti_join(self.d, by=['x', 'y'])
+    j_test_2 = self.d >> anti_join(self.c, by=['x', 'y'])
+    self.assertTrue(j_test_1.equals(j_pd_1))
+    self.assertTrue(j_test_2.equals(j_pd_2))
+    # use different column names
+    alt_c = self.c.rename(columns={'x': 'x_2'})
+    j_test_1 = alt_c >> anti_join(self.d, by=[('x_2', 'x'), 'y'])
+    j_test_2 = self.d >> anti_join(alt_c, by=[('x', 'x_2'), 'y'])
+    j_pd_1 = DplyFrame(pd.read_csv(StringIO("""index,x_2,y,a
+3,3,3,4""")).set_index(['index']))
+    j_pd_1.index.name = None
+    self.assertTrue(j_test_1.equals(j_pd_1))
+    self.assertTrue(j_test_2.equals(j_pd_2))
+
+
 
 if __name__ == '__main__':
   unittest.main()
