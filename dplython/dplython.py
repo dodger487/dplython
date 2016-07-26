@@ -80,8 +80,8 @@ class DplyFrame(DataFrame):
     return self
 
   def apply_on_groups(self, delayedFcn):
-
-    handled_classes = (mutate, sift, inner_join, full_join, left_join, right_join, semi_join, anti_join)
+    handled_classes = (mutate, sift, inner_join, full_join, left_join, 
+                       right_join, semi_join, anti_join, summarize)
     if isinstance(delayedFcn, handled_classes):
       return delayedFcn(self)
 
@@ -210,13 +210,15 @@ def select(*args):
   0     E   0.23
   1     E   0.21
   2     E   0.23
-    Grouping variables are implied in selection.
+
+  Grouping variables are implied in selection.
   >>> df >> group_by(X.a, X.b) >> select(X.c)
-  returns a dataframe like df[[X.a, X.b, X.c]]
-  with the variables appearing in grouped order before the selected column(s), unless a grouped variable is explicitly
-  selected
+  returns a dataframe like `df[[X.a, X.b, X.c]]` with the variables appearing in
+  grouped order before the selected column(s), unless a grouped variable is
+  explicitly selected
+
   >>> df >> group_by(X.a, X.b) >> select(X.c, X.b)
-  returns a dataframe like df[[X.a, X.c, X.b]]
+  returns a dataframe like `df[[X.a, X.c, X.b]]`
   """
   def select_columns(df, args):
     columns = [column._name for column in args]
@@ -307,17 +309,40 @@ def group_by(*args, **kwargs):
   return GroupDF
 
 
-@ApplyToDataframe
-def summarize(**kwargs):
-  def CreateSummarizedDf(df):
-    input_dict = {k: val.evaluate(df) for k, val in six.iteritems(kwargs)}
-    if len(input_dict) == 0:
-      return DplyFrame({}, index=index)
-    if hasattr(df, "_current_group") and df._current_group:
-      input_dict.update(df._current_group)
-    index = [0]
-    return DplyFrame(input_dict, index=index)
-  return CreateSummarizedDf
+class summarize(Verb):
+  """Summarizes a dataset via functions
+  >>>(diamonds >>
+  ...        group_by(X.cut, X.carat_bin) >>
+  ...        summarize(avg_price=X.price.mean()))
+  If the dataset has grouping, summarizing will be done for each group,
+  otherwise, will return a single row
+  """
+
+  def __call__(self, df):
+    def summarize(df):
+      input_dict = {k: val.evaluate(df) for k, val in six.iteritems(self.kwargs)}
+      if len(input_dict) == 0:
+        return DplyFrame({}, index=index)
+      if hasattr(df, "_current_group") and df._current_group:
+        input_dict.update(df._current_group)
+      index = [0]
+      return DplyFrame(input_dict, index=index)
+    if df._grouped_on:
+      outDf = df._grouped_self.apply(summarize)
+    else:
+      outDf = summarize(df)
+
+    # Remove multi-index created from grouping and applying
+    for grouped_name in outDf.index.names[:-1]:
+      if grouped_name in outDf:
+        outDf.reset_index(level=0, drop=True, inplace=True)
+      else:
+        outDf.reset_index(level=0, inplace=True)
+
+    # Drop all 0 index, created by summarize
+    if (outDf.index == 0).all():
+      outDf.reset_index(drop=True, inplace=True)
+    return outDf >> ungroup()
 
 
 @ApplyToDataframe
@@ -338,7 +363,7 @@ def UngroupDF(df):
 @ApplyToDataframe
 def ungroup():
   return UngroupDF
-  
+
 
 @ApplyToDataframe
 def arrange(*args):
@@ -438,6 +463,7 @@ def if_else(bool_series, series_true, series_false):
   newSeries.index = index
   return newSeries
 
+
 def get_join_cols(by_entry):
   """ helper function used for joins
   builds left and right join list for join function
@@ -452,6 +478,7 @@ def get_join_cols(by_entry):
       left_cols.append(col[0])
       right_cols.append(col[1])
   return left_cols, right_cols
+
 
 def mutating_join(*args, **kwargs):
   """ generic function for mutating dplyr-style joins
@@ -469,10 +496,12 @@ def mutating_join(*args, **kwargs):
     dsuffixes = ('_x', '_y')
   if left._grouped_on:
     outDf = (DplyFrame((left >> ungroup())
-                       .merge(right, how=kwargs['how'], left_on=left_cols, right_on=right_cols, suffixes=dsuffixes))
+                       .merge(right, how=kwargs['how'], left_on=left_cols, 
+                              right_on=right_cols, suffixes=dsuffixes))
              .regroup(left._grouped_on))
   else:
-    outDf = DplyFrame(left.merge(right, how=kwargs['how'], left_on=left_cols, right_on=right_cols, suffixes=dsuffixes))
+    outDf = DplyFrame(left.merge(right, how=kwargs['how'], left_on=left_cols, 
+                                 right_on=right_cols, suffixes=dsuffixes))
   return outDf
 
 
@@ -481,7 +510,9 @@ class Join(Verb):
   """
 
   def __new__(cls, *args, **kwargs):
-    if len(args) > 1 and isinstance(args[0], pandas.DataFrame) and isinstance(args[1], pandas.DataFrame):
+    if (len(args) > 1 and 
+        isinstance(args[0], pandas.DataFrame) and 
+        isinstance(args[1], pandas.DataFrame)):
       verb = cls(*args[1:], **kwargs)
       return verb(args[0].copy(deep=True))
     else:
@@ -494,23 +525,31 @@ class Join(Verb):
 class inner_join(Join):
   """ Perform sql style inner join
   >>> left_data >> inner_join(right_data[
-  ...                                    , by=[join_columns_in_list_as_single_or_tuple][
-  ...                                    , suffixes=('_x', _y)]])
+  ...                            , by=[join_columns_in_list_as_single_or_tuple][
+  ...                            , suffixes=('_x', _y)]])
   e.g. flights2 >> inner_join(airports, by=[('origin', 'faa')]) >> head(5)
 
   returns dataframe preserving any grouping from left dataframe
 
   Select all rows from both tables where there are matches on specified columns.
 
-  The by argument takes a list of columns. For a list like ['A', 'B'], it assumes 'A' and 'B' are columns in both
-  dataframes.
-  For a list like [('A', 'B')], it assumes column 'A' in the left dataframe is the same as column 'B' in the right dataframe.
-  Can mix and match (e.g. by=['A', ('B', 'C')] will assume both dataframes have column 'A', and column 'B' in the left
-  dataframe is the same as column 'C' in the right dataframe.
-  If by is not specified, then all shared columns will be assumed to be the join columns.
+  The by argument takes a list of columns. For a list like ['A', 'B'], it 
+  assumes 'A' and 'B' are columns in both dataframes.
 
-  suffixes will be used to rename columns that are common to both dataframes, but not used in the join operation.
-  e.g. suffixes=('_1', '_2').
+  For a list like [('A', 'B')], it assumes column 'A' in the left dataframe is 
+  the same as column 'B' in the right dataframe.
+
+  Can mix and match (e.g. by=['A', ('B', 'C')] will assume both dataframes have 
+  column 'A', and column 'B' in the left dataframe is the same as column 'C' 
+  in the right dataframe.
+
+  If by is not specified, then all shared columns will be assumed to be the 
+  join columns.
+
+  suffixes will be used to rename columns that are common to both dataframes,
+  but not used in the join operation.
+  e.g. `suffixes=('_1', '_2')`
+
   If suffixes is not included, then the pandas default will be used ('_x', '_y')
   """
   __name__ = 'inner_join'
@@ -523,24 +562,29 @@ class inner_join(Join):
 class full_join(Join):
   """ Perform sql style outer/full join
   >>> left_data >> full_join(right_data[
-  ...                                   , by=[join_columns_in_list_as_single_or_tuple][
-  ...                                   , suffixes=('_x', _y)]])
+  ...                            , by=[join_columns_in_list_as_single_or_tuple][
+  ...                            , suffixes=('_x', _y)]])
   e.g. flights2 >> full_join(airports, by=[('origin', 'faa')]) >> head(5)
 
   returns dataframe preserving any grouping from left dataframe
 
-  Select all rows from both tables, matching when possible, filling in missing values where data doesn't match.
+  Select all rows from both tables, matching when possible, filling in 
+  missing values where data doesn't match.
 
-  The by argument takes a list of columns. For a list like ['A', 'B'], it assumes 'A' and 'B' are columns in both
-  dataframes.
-  For a list like [('A', 'B')], it assumes column 'A' in the left dataframe is the same as column 'B' in the right
-  dataframe.
-  Can mix and match (e.g. by=['A', ('B', 'C')] will assume both dataframes have column 'A', and column 'B' in the left
-  dataframe is the same as column 'C' in the right dataframe.
-  If by is not specified, then all shared columns will be assumed to be the join columns.
+  The by argument takes a list of columns. For a list like ['A', 'B'], it 
+  assumes 'A' and 'B' are columns in both dataframes.
+  
+  For a list like [('A', 'B')], it assumes column 'A' in the left dataframe 
+  is the same as column 'B' in the right dataframe.
 
-  suffixes will be used to rename columns that are common to both dataframes, but not used in the join operation.
-  e.g. suffixes=('_1', '_2').
+  Can mix and match (e.g. by=['A', ('B', 'C')] will assume both dataframes 
+  have  column 'A', and column 'B' in the left dataframe is the same as column 
+  'C' in the right dataframe. If by is not specified, then all shared columns 
+  will be assumed to be the join columns.
+
+  suffixes will be used to rename columns that are common to both dataframes,
+  but not used in the join operation.
+  e.g. `suffixes=('_1', '_2')`.
   If suffixes is not included, then the pandas default will be used ('_x', '_y')
   """
 
@@ -554,25 +598,27 @@ class full_join(Join):
 class left_join(Join):
   """ Perform sql style left join
   >>> left_data >> left_join(right_data[
-  ...                                   , by=[join_columns_in_list_as_single_or_tuple][
-  ...                                   , suffixes=('_x', _y)]])
+  ...                            , by=[join_columns_in_list_as_single_or_tuple][
+  ...                            , suffixes=('_x', _y)]])
   e.g. flights2 >> full_join(airports, by=[('origin', 'faa')]) >> head(5)
 
   returns dataframe preserving any grouping from left dataframe
 
-  Select all rows from the left table, and corresponding rows from the right table where values match,
-  filling in missing values where data doesn't match.
+  Select all rows from the left table, and corresponding rows from the right 
+  table where values match, filling in missing values where data doesn't match.
+  
 
-  The by argument takes a list of columns. For a list like ['A', 'B'], it assumes 'A' and 'B' are columns in both
-  dataframes.
-  For a list like [('A', 'B')], it assumes column 'A' in the left dataframe is the same as column 'B' in the right
-  dataframe.
-  Can mix and match (e.g. by=['A', ('B', 'C')] will assume both dataframes have column 'A', and column 'B' in the left
-  dataframe is the same as column 'C' in the right dataframe.
-  If by is not specified, then all shared columns will be assumed to be the join columns.
+  The by argument takes a list of columns. For a list like ['A', 'B'], it 
+  assumes 'A' and 'B' are columns in both dataframes. For a list like [('A', 
+  'B')], it assumes column 'A' in the left dataframe is the same as column 'B' 
+  in the right dataframe. Can mix and match (e.g. by=['A', ('B', 'C')] will 
+  assume both dataframes have column 'A', and column 'B' in the left dataframe 
+  is the same as column 'C' in the right dataframe. If by is not specified, then
+  all shared columns will be assumed to be the join columns.
 
-  suffixes will be used to rename columns that are common to both dataframes, but not used in the join operation.
-  e.g. suffixes=('_1', '_2').
+  suffixes will be used to rename columns that are common to both dataframes,
+  but not used in the join operation.
+  e.g. `suffixes=('_1', '_2')`.
   If suffixes is not included, then the pandas default will be used ('_x', '_y')
   """
 
@@ -586,25 +632,28 @@ class left_join(Join):
 class right_join(Join):
   """ Perform sql style right join
   >>> left_data >> right_join(right_data[
-  ...                                    , by=[join_columns_in_list_as_single_or_tuple][
-  ...                                    , suffixes=('_x', _y)]])
+  ...                            , by=[join_columns_in_list_as_single_or_tuple][
+  ...                            , suffixes=('_x', _y)]])
   e.g. flights2 >> right_join(airports, by=[('origin', 'faa')]) >> head(5)
 
   returns dataframe preserving any grouping from left dataframe
 
-  Select all rows from the right table, and corresponding rows from the left table where values match,
-  filling in missing values where data doesn't match.
+  Select all rows from the right table, and corresponding rows from the left 
+  table where values match, filling in missing values where data doesn't match.
+  
 
-  The by argument takes a list of columns. For a list like ['A', 'B'], it assumes 'A' and 'B' are columns in both
-  dataframes.
-  For a list like [('A', 'B')], it assumes column 'A' in the left dataframe is the same as column 'B' in the right
-  dataframe.
-  Can mix and match (e.g. by=['A', ('B', 'C')] will assume both dataframes have column 'A', and column 'B' in the left
-  dataframe is the same as column 'C' in the right dataframe.
-  If by is not specified, then all shared columns will be assumed to be the join columns.
+  The by argument takes a list of columns. For a list like ['A', 'B'], it 
+  assumes 'A' and 'B' are columns in both dataframes. For a list like [('A', 
+  'B')], it assumes column 'A' in the left dataframe is the same as column 'B' 
+  in the right dataframe. Can mix and match (e.g. by=['A', ('B', 'C')] will 
+  assume both dataframes have column 'A', and column 'B' in the left dataframe 
+  is the same as column 'C' in the right dataframe. If by is not specified, then
+  all shared columns will be assumed to be the join columns.
 
-  suffixes will be used to rename columns that are common to both dataframes, but not used in the join operation.
-  e.g. suffixes=('_1', '_2').
+  suffixes will 
+  be used to rename columns that are common to both dataframes, but not used in 
+  the join operation.
+  e.g. `suffixes=('_1', '_2')`.
   If suffixes is not included, then the pandas default will be used ('_x', '_y')
   """
 
@@ -613,6 +662,7 @@ class right_join(Join):
   def __call__(self, df):
     self.kwargs.update({'how': 'right'})
     return mutating_join(df, self.args[0], **self.kwargs)
+
 
 def filtering_join(*args, **kwargs):
   left = args[0]
@@ -625,14 +675,17 @@ def filtering_join(*args, **kwargs):
     cols = lambda right, left: [x for x in left.columns.values.tolist() if x in right.columns.values.tolist()]
   if left._grouped_on:
     outDf = DplyFrame((left >> ungroup())
-                      .merge(right[cols(left, right)].drop_duplicates(), how=kwargs['how'], left_on=left_cols
-                             , right_on=right_cols, indicator=True, suffixes=('', '_y'))
+                      .merge(right[cols(left, right)].drop_duplicates(), 
+                             how=kwargs['how'], left_on=left_cols, 
+                             right_on=right_cols, indicator=True, 
+                             suffixes=('', '_y'))
                       .query(kwargs['query'])
                       .regroup(left._grouped_on)
                       .iloc[:, range(0, len(left.columns))])
   else:
     outDf = DplyFrame(left.merge(right[cols(left, right)]
-                                 .drop_duplicates(), how=kwargs['how'], left_on=left_cols, right_on=right_cols,
+                                 .drop_duplicates(), how=kwargs['how'], 
+                                 left_on=left_cols, right_on=right_cols,
                                  indicator=True, suffixes=('', '_y'))
                       .query(kwargs['query'])
                       .iloc[:, range(0, len(left.columns))])
@@ -647,17 +700,20 @@ class semi_join(Join):
 
   returns dataframe preserving any grouping from left dataframe
 
-  Filters the left table by including observations that are also found in the right table.
-  Never returns more observations than are found in the left table (i.e. multiple keys in the right table won't cause
-  duplicate observations to appear in the right table).
-
-  The by argument takes a list of columns. For a list like ['A', 'B'], it assumes 'A' and 'B' are columns in both
-  dataframes.
-  For a list like [('A', 'B')], it assumes column 'A' in the left dataframe is the same as column 'B' in the right
-  dataframe.
-  Can mix and match (e.g. by=['A', ('B', 'C')] will assume both dataframes have column 'A', and column 'B' in the left
-  dataframe is the same as column 'C' in the right dataframe.
-  If by is not specified, then all shared columns will be assumed to be the join columns.
+  Filters the left table by including observations that are also found in the
+  right table. Never returns more observations than are found in the left table
+  (i.e. multiple keys in the right table won't cause duplicate observations to 
+  appear in the right table).
+ 
+  The by argument takes a list of columns. For a
+  list like ['A', 'B'], it assumes 'A' and 'B' are columns in both dataframes. 
+  For a list like [('A', 'B')], it assumes column 'A' in the left dataframe is 
+  the same as column 'B' in the right dataframe. Can mix and match (e.g. 
+  by=['A', ('B', 'C')] will assume both dataframes have column 'A', and column 
+  'B' in the left dataframe is the same as column 'C' in the right dataframe. If
+  by is not specified, then all shared columns will be assumed to be the join 
+  columns.
+  
   """
 
   __name__ = 'semi_join'
@@ -674,17 +730,19 @@ class anti_join(Join):
 
   returns dataframe with any grouping preserved from left dataframe
 
-  Filters the left table by including observations that are not found in the right table.
-  Never returns more observations than are found in the left table (i.e. multiple keys in the right table won't cause
-  duplicate observations to appear in the right table).
+  Filters the left table by including observations that are not found in the 
+  right table. Never returns more observations than are found in the left table 
+  (i.e. multiple keys in the right table won't cause duplicate observations to 
+  appear in the right table).
 
-  The by argument takes a list of columns. For a list like ['A', 'B'], it assumes 'A' and 'B' are columns in both
-  dataframes.
-  For a list like [('A', 'B')], it assumes column 'A' in the left dataframe is the same as column 'B' in the right
-  dataframe.
-  Can mix and match (e.g. by=['A', ('B', 'C')] will assume both dataframes have column 'A', and column 'B' in the left
-  dataframe is the same as column 'C' in the right dataframe.
-  If by is not specified, then all shared columns will be assumed to be the join columns.
+  The by argument takes a list of columns. For a 
+  list like ['A', 'B'], it assumes 'A' and 'B' are columns in both dataframes. 
+  For a list like [('A', 'B')], it assumes column 'A' in the left dataframe is 
+  the same as column 'B' in the right dataframe. Can mix and match (e.g. 
+  by=['A', ('B', 'C')] will assume both dataframes have column 'A', and column 
+  'B' in the left dataframe is the same as column 'C' in the right dataframe. If
+   by is not specified, then all shared columns will be assumed to be the join 
+  columns. 
   """
 
   __name__ = 'anti_join'
