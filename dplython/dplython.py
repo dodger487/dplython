@@ -175,9 +175,9 @@ class sift(Verb):
     # TODO: This function is a candidate for improvement!
     final_filter = pandas.Series([True for t in range(len(df))])
     final_filter.index = df.index
-    grouped = True if df._grouped_on else False
+    grouped = "transform" if df._grouped_on else None
     for arg in self.args:
-      stmt = arg.evaluate(df, fast=grouped)
+      stmt = arg.evaluate(df, special=grouped)
       final_filter = final_filter & stmt
     if final_filter.dtype != bool:
       raise Exception("Inputs to filter must be boolean")
@@ -275,13 +275,13 @@ class mutate(Verb):
   def __call__(self, df):
     for arg in self.args:
       if isinstance(arg, Later):
-        df[str(arg)] = arg.evaluate(df, fast=True)
+        df[str(arg)] = arg.evaluate(df, special="transform")
       else:
         df[str(arg)] = arg
 
     for key, val in _dict_to_possibly_ordered_tuples(self.kwargs):
       if isinstance(val, Later):
-        df[key] = val.evaluate(df, fast=True)
+        df[key] = val.evaluate(df, special="transform")
       else:
         df[key] = val
     return df
@@ -320,17 +320,22 @@ class summarize(Verb):
 
   def __call__(self, df):
     def summarize(df):
-      input_dict = {k: val.evaluate(df) for k, val in six.iteritems(self.kwargs)}
+      if df._grouped_on:
+        input_dict = {k: val.evaluate(df, special="agg")
+            for k, val in six.iteritems(self.kwargs)}
+        return DplyFrame(input_dict).reset_index()
+      else:
+        input_dict = {k: val.evaluate(df) for k, val
+                      in six.iteritems(self.kwargs)}
+
       if len(input_dict) == 0:
         return DplyFrame({}, index=index)
       if hasattr(df, "_current_group") and df._current_group:
         input_dict.update(df._current_group)
       index = [0]
       return DplyFrame(input_dict, index=index)
-    if df._grouped_on:
-      outDf = df._grouped_self.apply(summarize)
-    else:
-      outDf = summarize(df)
+
+    outDf = summarize(df)
 
     # Remove multi-index created from grouping and applying
     for grouped_name in outDf.index.names[:-1]:
@@ -348,8 +353,9 @@ class summarize(Verb):
 @ApplyToDataframe
 def count(*args, **kwargs):
   def CreateCountDf(df):
+    col_name = df.columns[0]
     return (df >> group_by(*args, **kwargs) >>
-                  summarize(n=X._.__len__()) >> ungroup())
+                  summarize(n=X[col_name].__len__()) >> ungroup())
   return CreateCountDf
   
 
