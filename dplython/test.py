@@ -742,6 +742,15 @@ class TestTransmute(unittest.TestCase):
                               __order=('new_price', 'x_plus_y')))
     self.assertTrue(mutate_select_df.equals(transmute_df))
 
+  def test_transmute_args(self):
+    mutate_select_df = (self.diamonds >>
+                        mutate(X.price * 2, X.x + X.y) >>
+                        select(X["X.price * 2"], X["X.x + X.y"]))
+    transmute_df = (self.diamonds >>
+                    transmute(X.price * 2, X.x + X.y))
+    self.assertTrue(mutate_select_df.equals(transmute_df))
+
+
 class TestMutatingJoins(unittest.TestCase):
 
   def test_inner_join(self):
