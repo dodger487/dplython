@@ -399,6 +399,12 @@ def head(*args, **kwargs):
 
 
 @ApplyToDataframe
+def tail(*args, **kwargs):
+  """Returns last n rows"""
+  return lambda df: df.tail(*args, **kwargs)
+
+
+@ApplyToDataframe
 def sample_n(n):
   """Randomly sample n rows from the DataFrame"""
   return lambda df: DplyFrame(df.sample(n))
