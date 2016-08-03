@@ -442,7 +442,7 @@ def rename(**kwargs):
 
 
 @ApplyToDataframe
-def transmute(**kwargs):
+def transmute(*args, **kwargs):
   """ Similar to `select` but allows mutation in column definitions.
 
   In : (diamonds >>
@@ -454,8 +454,11 @@ def transmute(**kwargs):
     1        652      7.73
     2        654      8.12
   """
-  mutate_dateframe_fn = mutate(**dict(kwargs))
-  column_names = [name for name, _ in _dict_to_possibly_ordered_tuples(kwargs)]
+  mutate_dateframe_fn = mutate(*args, **dict(kwargs))
+  column_names_args = [str(arg) for arg in args]
+  column_names_kwargs = [name for name, _
+                         in _dict_to_possibly_ordered_tuples(kwargs)]
+  column_names = column_names_args + column_names_kwargs
   return lambda df: mutate_dateframe_fn(df)[column_names]
 
 
