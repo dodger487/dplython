@@ -20,7 +20,7 @@ The goal of this project is to implement the functionality of the R package Dply
 * `Dplyr <https://cran.rstudio.com/web/packages/dplyr/vignettes/introduction.html>`_
 * `Pandas <http://pandas.pydata.org/pandas-docs/stable/10min.html>`_
 
-This is version 0.0.6.
+This is version 0.0.7.
 It's experimental and subject to change.
 
 

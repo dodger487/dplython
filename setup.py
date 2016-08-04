@@ -6,10 +6,10 @@ from setuptools import setup, find_packages
 
 setup(
     name="dplython",
-    version="0.0.6",
+    version="0.0.7",
     description="Dplyr-style operations on top of pandas DataFrame.",
     url="https://github.com/dodger487/dplython",
-    download_url="https://github.com/dodger487/dplython/tarball/0.0.6",
+    download_url="https://github.com/dodger487/dplython/tarball/0.0.7",
     packages=find_packages(),
     license="MIT",
     keywords="pandas data dplyr",
