@@ -81,7 +81,7 @@ class DplyFrame(DataFrame):
 
   def apply_on_groups(self, delayedFcn):
     handled_classes = (mutate, sift, inner_join, full_join, left_join, 
-                       right_join, semi_join, anti_join, summarize)
+                       right_join, semi_join, anti_join, summarize, head, nrow)
     if isinstance(delayedFcn, handled_classes):
       return delayedFcn(self)
 
@@ -392,10 +392,21 @@ def arrange(*args):
   return f
 
 
-@ApplyToDataframe
-def head(*args, **kwargs):
-  """Returns first n rows"""
-  return lambda df: df.head(*args, **kwargs)
+class head(Verb):
+  """returns first n rows; maintains grouping if present"""
+
+  __name__ = "head"
+
+  def __call__(self, df):
+    if df._grouped_on:
+      return (df >> ungroup()).head(*self.args, **self.kwargs) \
+                              .regroup(df._grouped_on)
+    else:
+      return df.head(*self.args, **self.kwargs)
+
+  def __rrshift__(self, other):
+    return self.__call__(other)
+
 
 
 @ApplyToDataframe
@@ -422,9 +433,18 @@ def sample(*args, **kwargs):
   return lambda df: df.sample(*args, **kwargs)
 
 
-@ApplyToDataframe
-def nrow():
-  return lambda df: len(df)
+class nrow(Verb):
+  """return number of rows"""
+
+  __name__ = "nrow"
+
+  def __call__(self, df):
+    return len(df >> ungroup())
+
+  def __rrshift__(self, other):
+    return self.__call__(other)
+
+
 
 
 @ApplyToDataframe
