@@ -8,7 +8,6 @@ import math
 import unittest
 import os
 
-# import this for quick dataframe creation
 import sys
 if sys.version_info[0] < 3:
   from StringIO import StringIO
@@ -1128,6 +1127,51 @@ Marvel,1939""")))
     self.assertTrue(j_test_1.equals(j_pd_1))
     self.assertTrue(j_test_2.equals(j_pd_2))
 
+
+class TestGather(unittest.TestCase):
+
+  def test_gather_1(self):
+    names = [ 'Wilbur', 'Petunia', 'Gregory' ]
+    a = [ 67, 80, 64 ]
+    b = [ 56, 90, 50 ]
+    input_df = DplyFrame(pandas.DataFrame({'names': names, 'a': a, 'b': b}))
+    gathered = input_df >> gather("drug", "heartrate", [X.a, X.b])
+    gather_pd = DplyFrame(pd.read_csv(StringIO("""names,drug,heartrate
+Wilbur,a,67
+Petunia,a,80
+Gregory,a,64
+Wilbur,b,56
+Petunia,b,90
+Gregory,b,50
+""")))
+    self.assertTrue(gathered.equals(gather_pd))
+    # test if grouped
+    gathered = input_df >> group_by(X.a) >> gather("drug", "heartrate", [X.a, X.b])
+    self.assertTrue(gathered.equals(gather_pd))
+    # test normal form
+    gathered = gather(input_df, "drug", "heartrate", [X.a, X.b])
+    self.assertTrue(gathered.equals(gather_pd))
+
+  def test_gather_2(self):
+    input_df = DplyFrame(pd.DataFrame({'country': ['Afghanistan', 'Brazil', 'China']
+                                       , 1999: [745, 37737, 212258]
+                                       , 2000: [2666, 80488, 213766]}))
+    gather_pd = DplyFrame(pd.read_csv(StringIO("""country,year,cases
+Afghanistan,1999,745
+Brazil,1999,37737
+China,1999,212258
+Afghanistan,2000,2666
+Brazil,2000,80488
+China,2000,213766""")))
+    gathered = input_df >> gather('year', 'cases', [X[1999], X[2000]])
+    # some type issue, but values are correct; pandas should induce correction when comparing
+    self.assertTrue((gathered == gather_pd).all().all())
+    # test if grouped
+    gathered = input_df >> group_by(X[1999]) >> gather('year', 'cases', [X[1999], X[2000]])
+    self.assertTrue((gathered == gather_pd).all().all())
+    # test normal form
+    gathered = gather(input_df, 'year', 'cases', [X[1999], X[2000]])
+    self.assertTrue((gathered == gather_pd).all().all())
 
 
 if __name__ == '__main__':
