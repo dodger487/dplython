@@ -80,8 +80,10 @@ class DplyFrame(DataFrame):
     return self
 
   def apply_on_groups(self, delayedFcn):
-    handled_classes = (mutate, sift, inner_join, full_join, left_join, gather,
-                       right_join, semi_join, anti_join, summarize, head, nrow)
+    handled_classes = (mutate, sift, summarize,
+                       inner_join, full_join, left_join,
+                       right_join, semi_join, anti_join, 
+                       head, nrow, gather, spread)
     if isinstance(delayedFcn, handled_classes):
       return delayedFcn(self)
 
@@ -790,11 +792,12 @@ class anti_join(Join):
 class gather(Verb):
   """Convert data from wide to long
   >>> df >> gather(key, value, columns)
-  create a new column, key, consisting of the values in the columns values, creating key-value pairs
-  eg
-  flights >> gather('delay', 'value', [X.dep_delay, X.arr_delay])
-  takes the two columns dep_delay and arr_delay, combines them into a single column called 'value', and creates another
-  column 'delay' that indicates whether each value comes from dep_delay or arr_delay
+  create a new column, key, consisting of the values in the columns values, 
+  creating key-value pairs, e.g.:
+  >>> flights >> gather('delay', 'value', [X.dep_delay, X.arr_delay])
+  takes the two columns dep_delay and arr_delay, combines them into a single 
+  column called 'value', and creates another column 'delay' that indicates 
+  whether each value comes from dep_delay or arr_delay
   """
 
   __name__ = 'gather'
@@ -806,3 +809,38 @@ class gather(Verb):
     key = self.args[0]
     value = self.args[1]
     return pandas.melt(df, id_vars, id_vals, key, value)
+
+
+def new_spread_cols(df, cols):
+  temp_index_for_reshape = ['' for i in range(len(df))]
+  for col in cols:
+    temp_index_for_reshape += df[col].map(str)
+  return temp_index_for_reshape
+
+
+class spread(Verb):
+  """Convert data from long to wide by spreading out data amongst key-value 
+  pairs
+  
+  >>> df >> spread(key, value)
+  makes a new dataframe, where the values of key becomes column names, with 
+  the associated value becoming the value for that column
+  """
+
+  __name__ = 'spread'
+
+  def __call__(self, df):
+    key = self.args[0]
+    values = self.args[1]
+    df_columns = df.columns.values.tolist()
+    spread_index_columns = [col for col in df_columns if col not in [key._name, values._name]]
+    temp_columns = new_spread_cols(df, spread_index_columns)
+    out_df = (df >> ungroup()).assign(temp_index_for_reshape=temp_columns)
+    out_df = out_df.set_index('temp_index_for_reshape')
+    new_spread_data = out_df[[key._name, values._name]]
+    if not all(new_spread_data.groupby([new_spread_data.index, key._name]).agg('count').reset_index().value < 2):
+      raise ValueError('Duplicate identifers')
+    new_data = new_spread_data.pivot(columns=key._name, values=values._name)
+    old_data = out_df[spread_index_columns].drop_duplicates()
+    output_data = old_data.merge(new_data, left_index=True, right_index=True).reset_index(drop=True)
+    return output_data

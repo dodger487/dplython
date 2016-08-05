@@ -1174,5 +1174,65 @@ China,2000,213766""")))
     self.assertTrue((gathered == gather_pd).all().all())
 
 
+class TestSpread(unittest.TestCase):
+
+  def test_spread_1(self):
+    input_df = DplyFrame(pd.read_csv(StringIO("""row,var,value
+1,Sepal.Length,5.1
+1,Species,setosa
+1,Species_num,1
+51,Sepal.Length,7.0
+51,Species,versicolor
+51,Species_num,2""")))
+    input_pd = DplyFrame(pd.read_csv(StringIO("""row,Sepal.Length,Species,Species_num
+1,5.1,setosa,1
+51,7.0,versicolor,2
+""")))
+    spread_test_df = input_df >> spread(X.var, X.value)
+    # test 1
+    # must change datatype so that dataframe compare equal
+    input_pd['Sepal.Length'] = input_pd['Sepal.Length'].astype(str)
+    input_pd['Species_num'] = input_pd['Species_num'].astype(str)
+    self.assertTrue(spread_test_df.equals(input_pd))
+    # test normal form
+    spread_test_df = spread(input_df, X.var, X.value)
+    self.assertTrue(spread_test_df.equals(input_pd))
+
+  def test_spread_2(self):
+    input_df = DplyFrame(pd.read_csv(StringIO("""country,year,key,value
+1,Afghanistan,1999,cases,745
+2,Afghanistan,1999,population,19987071
+3,Afghanistan,2000,cases,2666
+4,Afghanistan,2000,population,20595360
+5,Brazil,1999,cases,37737
+6,Brazil,1999,population,172006362
+7,Brazil,2000,cases,80488
+8,Brazil,2000,population,174504898
+9,China,1999,cases,212258
+10,China,1999,population,1272915272
+11,China,2000,cases,213766
+12,China,2000,population,1280428583""")))
+    input_pd = DplyFrame(pd.read_csv(StringIO("""country,year,cases,population
+Afghanistan,1999,745,19987071
+Afghanistan,2000,2666,20595360
+Brazil,1999,37737,172006362
+Brazil,2000,80488,174504898
+China,1999,212258,1272915272
+China,2000,213766,1280428583""")))
+    spread_test_df_1 = input_df >> spread(X.key, X.value)
+    spread_test_df_2 = spread(input_df, X.key, X.value)
+    spread_test_df_3 = input_df >> group_by(X.key) >> spread(X.key, X.value)
+    self.assertTrue(input_pd.equals(spread_test_df_1))
+    self.assertTrue(input_pd.equals(spread_test_df_2))
+    self.assertTrue(input_pd.equals(spread_test_df_3))
+
+  def test_spread_3(self):
+    # duplicate identifiers should raise exception
+    input_df = DplyFrame(pd.read_csv(StringIO("""country,year,key,value
+1,Afghanistan,1999,cases,745
+2,Afghanistan,1999,cases,19987071""")))
+    self.assertRaises(ValueError, spread, input_df, X.key, X.value)
+
+
 if __name__ == '__main__':
   unittest.main()
