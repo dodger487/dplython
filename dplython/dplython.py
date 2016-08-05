@@ -23,7 +23,7 @@ except:
   from later import (Later, CreateLaterFunction, DelayFunction, X, Manager)
 
 
-__version__ = "0.0.6"
+__version__ = "0.0.7"
 
 
 def _addQuotes(item):
