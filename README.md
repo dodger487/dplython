@@ -16,6 +16,14 @@ The goal of this project is to implement the functionality of the R package Dply
 This is version 0.0.7.
 It's experimental and subject to change.
 
+## Introductory Video
+Here is a 20 minute video explaining dplython, given at PyGotham 2016.
+
+[![PyGotham Dplython video](http://img.youtube.com/vi/4YAcwCe1mAE/0.jpg)](https://www.youtube.com/watch?v=4YAcwCe1mAE "PyGotham Dplython Video")
+
+Click the awkward picture above to see the talk!
+Note that sound doesn't start until about 1 minute in due to microphone issues.
+
 ## Installation
 To install, use pip:
 ```
